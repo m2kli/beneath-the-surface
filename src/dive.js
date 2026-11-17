@@ -167,6 +167,7 @@ function seaObjective(netsLeft){
 function ensureSea(){ if(!V.sea || V.sea.season < V.season) V.sea = rollSea(eco, V, V.season, rng); }
 function startSeaDive(){
   ensureSea(); const S = V.sea; layoutSea(S); S.dived = true;
+  nightT = night = dioNight;   // the same time of day as the shore you dived from
   sea3.start = { seen: SEA_KEYS.filter(k => S.seen[k]).length, cots: S.gone.cots.length, trash: S.gone.trash.length, ev: S.evFound };
   if(!V.seaTut){ V.seaTut = true; cue(3, () => toast('水下能做的事', '游到发光的调查点停一会儿，岸上的预测就会变准。清掉长棘海星和垃圾，留意岸上看不到的问题。', 9500)); }
 }
@@ -195,4 +196,40 @@ function showSeaEvent(back){
     if(back === 'report') $('vReport').classList.add('on'); else $('village').classList.remove('modal');
     chime(3); renderVillageUI(); });
   $('vEvent').classList.add('on'); renderVillageUI();
+}
+// ---- from the shore: the season's underwater jobs as markers on the water; click one to dive straight to it
+const seaMk = { list: [], els: [], t: -1 };
+function seaMarkItems(S){
+  const items = [], add = (kind, pos, label) => { for(const it of items) if(it.kind === kind && it.pos.distanceTo(pos) < 26){ it.n++; return; } items.push({ kind, pos: pos.clone(), n: 1, label }); };
+  for(const k of SEA_KEYS) if(!S.seen[k]) add('survey', SURV[k].pos, SURV[k].short + '调查');
+  COTS.forEach((c, i) => { if(i < S.cots && !S.gone.cots.includes(i)) add('cots', c.position, '长棘海星'); });
+  TRASH.forEach((g, i) => { if(i < S.trash && !S.gone.trash.includes(i)) add('trash', g.position, '垃圾'); });
+  const nets = Math.round(clamp(eco.ghost/0.25, 0, 4)); debris.forEach((d, i) => { if(i < nets) add('net', d.pos, '幽灵网'); });
+  if(S.ev && !S.evFound) add('ev', sea3.evPos, '水下有动静');
+  return items;
+}
+function updateSeaMarks(){
+  const S = V.sea, show = mode === 'village' && !!S && ['plan', 'report'].includes(state) && !zoom && !unzoom && !$('village').classList.contains('modal');
+  if(!show){ for(const el of seaMk.els) el.classList.remove('on'); return; }
+  if(sea3.seed !== S.seed) layoutSea(S);
+  if(time - seaMk.t > 0.5){ seaMk.t = time; seaMk.list = seaMarkItems(S); }
+  seaMk.list.forEach((it, i) => {
+    let el = seaMk.els[i];
+    if(!el){ el = document.createElement('button'); el.type = 'button';
+      el.onclick = () => { const m = seaMk.list[+el.dataset.i]; if(!m || !['plan', 'report'].includes(state) || zoom) return; if(focusOn) exitFocus(); diveInto({ pos: () => pC.copy(m.pos) }, 'free'); };
+      $('marks').appendChild(el); seaMk.els.push(el); }
+    el.dataset.i = i;
+    const txt = it.label + (it.n > 1 ? ' ×' + it.n : '');
+    if(el.dataset.t !== it.kind + txt){ el.dataset.t = it.kind + txt; el.className = 'smk ' + it.kind; el.innerHTML = `<i></i><span>${txt}</span>`; el.title = '点击潜下去'; }
+    const p = pB.copy(it.pos).project(camera); let ok = p.z < 1 && Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.95;
+    if(ok){ it.sx = (p.x*0.5 + 0.5)*innerWidth; it.sy = (-p.y*0.5 + 0.5)*innerHeight; ok = !underUI(it.sx, it.sy) && !!portalVisibleAt(it.sx, it.sy); }
+    it.ok = ok; el.classList.toggle('on', ok);
+  });
+  // labels that land on top of each other stack downward instead
+  const placed = [];
+  seaMk.list.map((it, i) => [it, seaMk.els[i]]).filter(([it]) => it.ok).sort((a, b) => a[0].sy - b[0].sy).forEach(([it, el]) => {
+    let y = it.sy; const w = 18 + it.label.length*12;
+    for(let k=0;k<6;k++){ const hit = placed.find(q => Math.abs(q.x - it.sx) < (q.w + w)/2 && Math.abs(q.y - y) < 22); if(!hit) break; y = hit.y + 22; }
+    placed.push({ x: it.sx, y, w }); el.style.transform = `translate(${it.sx.toFixed(1)}px, ${y.toFixed(1)}px)`; });
+  for(let i = seaMk.list.length; i < seaMk.els.length; i++) seaMk.els[i].classList.remove('on');
 }

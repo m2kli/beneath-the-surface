@@ -191,6 +191,9 @@ void main(){
 #endif
   float flush = vLife * (1.0 - vLife) * 4.0;
   emit += vCol * flush * 0.9 * uRise + vCol * vLife * 0.04;
+  { float fz = step(0.5, fract(vRnd*3.7));                      // at night, fluorescent proteins: half the living colonies glow
+    vec3 fl = mix(mix(vec3(0.25, 1.0, 0.45), vec3(0.2, 0.85, 1.0), step(0.4, fract(vRnd*7.1))), vec3(0.95, 0.35, 1.0), step(0.8, fract(vRnd*7.1)));
+    emit += fl * fz * vLife * uNight * (0.22 + 0.1*sin(uTime*0.8 + vRnd*30.0)); }
   trans = vCol * vLife * 0.3;
 #endif
   vec3 col = shade(alb, n, vW, ao);
@@ -366,7 +369,7 @@ const ANEMONE_SPOTS = [];
   const pts = new THREE.Points(g, mat({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: /* glsl */`
-    attribute float aSize; uniform float uTime; varying float vA; varying float vBokeh; varying float vY;
+    attribute float aSize; uniform float uTime; varying float vA; varying float vBokeh; varying float vY; varying float vG;
     void main(){
       vec3 p = position + vec3(sin(uTime*0.15 + position.y)*1.5, -uTime*0.22*aSize, cos(uTime*0.12 + position.x)*1.5);
       p = mod(p - cameraPosition + 40.0, 80.0) - 40.0 + cameraPosition;
@@ -375,17 +378,19 @@ const ANEMONE_SPOTS = [];
       vBokeh = smoothstep(3.5, 0.8, d);
       vA = smoothstep(40.0, 22.0, d) * smoothstep(0.3, 1.2, d) * (0.6 + 0.4*sin(uTime*2.0 + position.z*9.0));
       vY = p.y;
+      float hsh = fract(sin(dot(position, vec3(12.9898, 78.233, 37.719)))*43758.5453);
+      vG = step(0.6, hsh) * uNight * (0.35 + 0.65*pow(0.5 + 0.5*sin(uTime*(1.5 + hsh*3.0) + hsh*60.0), 3.0)) * (1.0 + 1.5*smoothstep(10.0, 2.0, d));
       gl_PointSize = aSize * (80.0 + vBokeh * 220.0) / max(d, 0.5);
       gl_Position = projectionMatrix * mv;
     }`,
     fragmentShader: COMMON + /* glsl */`
-    varying float vA; varying float vBokeh; varying float vY;
+    varying float vA; varying float vBokeh; varying float vY; varying float vG;
     void main(){
       float r = length(gl_PointCoord - 0.5);
       float core = smoothstep(0.5, 0.05, r);
       float disc = smoothstep(0.5, 0.42, r) * (0.35 + 0.65*smoothstep(0.2, 0.46, r));
       float a = mix(core, disc * 0.35, vBokeh) * vA;
-      vec3 c = sunAt(vY) * mix(vec3(0.18, 0.18, 0.1), vec3(0.16, 0.24, 0.28), uHealth);
+      vec3 c = sunAt(vY) * mix(vec3(0.18, 0.18, 0.1), vec3(0.16, 0.24, 0.28), uHealth) + vec3(0.25, 1.0, 0.8) * vG * 2.6;
       gl_FragColor = vec4(c * a, 1.0);
     }`,
   }));
@@ -469,7 +474,8 @@ const ANEMONE_SPOTS = [];
       } else a = 0.3 * (1.0 + vL.y/3.4);
       vec3 lit = sunAt(vW.y) * 0.25 + 0.15;
       clipPortal(vW);
-      gl_FragColor = vec4(vCol * lit * a * transmit(waterPath(vW)) * mix(0.6, 1.0, uHealth), 1.0);
+      vec3 glow = mix(vCol, vec3(0.45, 0.9, 1.0), 0.5) * uNight * (0.55 + 0.45*sin(uTime*1.7 + vW.x*0.3)) * 0.9;   // bioluminescent at night
+      gl_FragColor = vec4((vCol * lit + glow) * a * transmit(waterPath(vW)) * mix(0.6, 1.0, uHealth), 1.0);
     }`,
   }), list, false);
 }

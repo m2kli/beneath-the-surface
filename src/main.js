@@ -232,7 +232,7 @@ function enterDiveSeamless(z){
   if(z.kind === 'trawl'){ setState('diveTrawl'); cue(1.5, startTrawl); } else { setState('freedive'); startSeaDive(); }
   diveIntroT = 0;
 }
-let diveIntroT = 99, camYawOff = 0, camPitch = -0.05, aimYaw = 0, swapT = 9;
+let wakeT = 0, diveIntroT = 99, camYawOff = 0, camPitch = -0.05, aimYaw = 0, swapT = 9;
 const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 
 // ---- the ocean's look follows the ecosystem (and, from the shore, the diorama's clock)
@@ -259,7 +259,7 @@ function oceanLook(dt, fromShore){
     if(bloomV > 0.005){ const b = bloomV; U.uSca.value.x += b*0.028; U.uSca.value.y += b*0.008; U.uSca.value.z += b*0.0015; U.uAbs.value.y += b*0.012; U.uAbs.value.z += b*0.032; } }
   U.uSunCol.value.set(lerp(3.3, 0.2, night), lerp(3.15, 0.28, night), lerp(2.9, 0.5, night));
   if(fromShore) U.uSunCol.value.multiplyScalar(lerp(1, 0.42, wx.grey));
-  finalPass.uniforms.uExposure.value = lerp(1.45, 0.82, e) * lerp(1, 2.8, night) * (fromShore ? 0.9*lerp(1, 0.78, wx.grey) : 1);
+  finalPass.uniforms.uExposure.value = lerp(1.45, 0.82, e) * lerp(1, fromShore || state === 'ending' ? 2.8 : 2.0, night) * (fromShore ? 0.9*lerp(1, 0.78, wx.grey) : 1);
   volMat.uniforms.uVolGain.value = lerp(0.3, 1.25, e);
   bloom.strength = lerp(0.3, 0.5, e) + night*0.25;
   if(spawnU.uSpawn.value > 0) spawnU.uSpawn.value += dt;
@@ -328,7 +328,7 @@ function frame(){
       portalU.tPortal.value = composer.readBuffer.texture;
       renderer.getDrawingBufferSize(drawSize); portalU.uRes.value.copy(drawSize);
       renderer.setRenderTarget(null); renderer.render(dio, dioCam);
-      updateMarks();
+      updateMarks(); updateSeaMarks();
       perf.ms = lerp(perf.ms, performance.now() - f0, 0.1);
       return;
     }
@@ -393,6 +393,7 @@ function frame(){
   placeOceanCamera();
 
   simulateOcean(dt, ctrl);
+  if(night > 0.35 && ctrl && player.speed > 2.5){ wakeT -= dt; if(wakeT < 0){ wakeT = 0.05; emit(tmp.copy(player.pos).addScaledVector(player.fwd, -1.4).add(pA.set(rng() - 0.5, rng() - 0.5, rng() - 0.5).multiplyScalar(1.6)), 3, 1.1, -1.1, 0.45*night); } }   // stirred plankton glows in your wake
 
   // --- where to go next
   let tgt = null, tgtName = '', poi = false;
