@@ -42,6 +42,9 @@ function logSeason(pre, r){
     morale: [Math.round(pre.morale), Math.round(V.morale)], why: r.morale.map(([l, x]) => [l, Math.round(x)]), pop: [r.pop0, r.pop1],
     catch: r1(r.catchT), sold: r1(r.sold), eat: r1(Math.min(r.catchT + pre.food, r.foodNeed)), fishInc: r1(r.fishInc), tourInc: r1(r.tourInc), visitors: Math.round(r.visitors),
     perCap: r1(r.perCap), staff: Math.round(r.staff*100), haul: r1(r.haul || 0), eco: [Math.round(eco.coral*100), Math.round(eco.fish*100), Math.round(eco.clar*100), Math.round((eco.pelagic ?? 1)*100)], tier: devTier(V), off: r1(r.offCatch || 0), whale: Math.round(r.whaleVis || 0) });
+  // what happened under the surface this season: the dive work and what nobody fixed
+  if(r.sea && r.seaS){ const S = r.seaS, x = r.sea; V.log[V.log.length - 1].sea = { dived: !!S.dived, seen: x.samples, cots: [S.gone.cots.length, S.cots], trash: [S.gone.trash.length, S.trash],
+    ev: S.ev ? { n: SEA_EV[S.ev].n, found: !!S.evFound, fix: !!S.evFix } : null, luck: [r1(S.t.coral*100), r1(S.t.fish*100), r1(S.t.pel*100)], dC: r1(x.dC*100), dF: r1(x.dF*100) }; }
   V.evLog = null;
   archiveRun();
 }
@@ -60,6 +63,9 @@ function ledger(log){
   const pubSum = Object.values(t.pub).reduce((a, x) => a + x, 0);
   return { ...t, grant: t.grant || 0, pubSum, net: t.tax + t.fee + (t.grant || 0) - pubSum - t.build - t.ev };
 }
+// one line about the season's underwater side, for the log
+const seaLine = e => { const q = e.sea; if(!q) return ''; const pm = x => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(1) + '%';
+  return `${q.dived ? `潜水 · 调查 ${q.seen}/3` : '没潜水'} · 长棘海星 清 ${q.cots[0]}/${q.cots[1]} · 垃圾 捡 ${q.trash[0]}/${q.trash[1]}${q.ev ? ` · ${q.ev.n}${q.ev.fix ? '（已处理）' : q.ev.found ? '（发现，没处理）' : '（没发现）'}` : ''} · 季末额外：珊瑚 ${pm(q.dC)} 鱼群 ${pm(q.dF)}`; };
 function logText(rec){
   const L = [`海面之下 · 游玩记录`, `开始 ${new Date(rec.startedAt || Date.now()).toLocaleString()} · 共 ${rec.log.length} 季${rec.ending ? ' · 结局：' + rec.ending : ''}`, ''];
   for(const e of rec.log){
@@ -70,6 +76,7 @@ function logText(rec){
     L.push(`  村库：税 +${e.tax}  门票 +${e.fee}  ${e.grant ? `保护资助 +${e.grant}  ` : ''}${e.pub.map(([l, x]) => `${l} −${x}`).join('  ')}  → 本季 ${fmt(e.dMoney)}`);
     L.push(`  渔获 ${e.catch} 吨（吃掉 ${e.eat}，卖出 ${e.sold}）  游客 ${e.visitors}  人手 ${e.staff}%  人均生活 ${e.perCap}`);
     L.push(`  民心：${e.why.map(([l, x]) => `${l} ${fmt(x)}`).join('  ') || '无变化'}`);
+    if(e.sea) L.push(`  水下：${seaLine(e)}`);
   }
   const g = ledger(rec.log);
   L.push('', `合计：税收 +${r1(g.tax)}  门票 +${r1(g.fee)}  ${Object.entries(g.pub).map(([l, x]) => `${l} −${r1(x)}`).join('  ')}  建设 −${g.build}  事件 −${r1(g.ev)}`);
@@ -127,6 +134,7 @@ function renderSys(){
           <div><em>村库</em>税 <span class="pos">+${e.tax}</span> · 门票 <span class="pos">+${e.fee}</span>${e.grant ? ` · 保护资助 <span class="pos">+${e.grant}</span>` : ''}${e.pub.map(([l, x]) => ` · ${l} <span class="negc">−${x}</span>`).join('')}</div>
           <div><em>渔获</em>${e.catch} 吨：村民吃掉 ${e.eat}，卖出 ${e.sold}${e.haul ? ` · 拖网 +${e.haul}` : ''} · 游客 ${e.visitors} · 人手 ${e.staff}%</div>
           <div><em>民心</em>${e.why.map(([l, x]) => `${l} <span class="${x < 0 ? 'negc' : 'pos'}">${fmt(x)}</span>`).join(' · ') || '无变化'}</div>
+          ${e.sea ? `<div><em>水下</em>${seaLine(e)}</div>` : ''}
           <div><em>海</em>珊瑚 ${e.eco[0]}% · 鱼群 ${e.eco[1]}% · 水质 ${e.eco[2]}% · 村民 ${e.pop[0]} → ${e.pop[1]}</div></div></details>`).join('')}</div>`;
     }
     el.innerHTML = `${back}<h3>游玩记录</h3>${list.length ? `<select id="logSel">${list.map(opt).join('')}</select>` : ''}${body}
