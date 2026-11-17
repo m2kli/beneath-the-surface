@@ -70,3 +70,15 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - **Performance:** the village frame was 24 ms. `updateMarks` raycast the dense water meshes once per "tap to become" marker (38 × 0.4 ms). It now uses a ray-box test against the water block: the village frame is ~9 ms, the dive ~6 ms.
 - **Balance baseline regenerated** (model numbers unchanged; the suite gained the goal-aware `careful` bot): careful bot 82% good endings without diving, 87% diving every season.
 - **Green plan, diving every season:** 16 seasons, 16 dives, 73 underwater tasks, ending "两边都撑过来了". No issues.
+
+## Round 6: flows not covered yet, guidance, and "why is it dropping"
+
+- **Swept:** trawl dive (prompt → dive → report), ending dive (end screen → swim → surface → end screen), the menu and the play log. All clean, no errors.
+- **Play log:** each season now records the underwater side: dived or not, surveys, starfish cleared, rubbish picked up, event status (handled / found but left / missed), and the season's extra coral and fish change.
+- **First-season tips** explain the arrows and `?`, the risky-left option order, and the underwater markers (new step on the dive button). Tips are kept on screen.
+- **Random events:** options now state their effects ("珊瑚会被打碎一些" → "珊瑚 −6%，渔获 −30%…").
+- **Sea meter tooltips:** hovering coral, fish or water lists this season's causes as arrows (e.g. 游客踩踏 ▼▼　污水 ▼). The season's luck appears only after it has been surveyed.
+- **Performance:** a fully built tier-4 town runs at 13.3 ms per frame (was 16.5).
+- **Balanced-plan bot:** 16 seasons, ending "村子富了。只富了一次。" (coral finished at 53%, just under the line), no UI issues.
+- **Balance suite:** identical to the baseline.
+- **Note for testing:** with the app window minimized, CSS transitions freeze. The HUD then reads as sitting on top of the village card, which looks like an overlap but isn't one.
