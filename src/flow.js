@@ -243,10 +243,11 @@ document.addEventListener('mouseout', e => { const t = e.target.closest && e.tar
 document.addEventListener('mousemove', e => { if($('tip').classList.contains('on')){ const w = $('tip').offsetWidth; $('tip').style.transform = `translate(${Math.min(e.clientX + 14, innerWidth - w - 10)}px, ${e.clientY + 16}px)`; } });
 // first-season coach
 const COACH = [
-  { sel: '#hud', side: 'l', t: '这是门前的海', x: '珊瑚、鱼群、水质。四年后，珊瑚和鱼群都要守在细竖线（55%）以上。' },
-  { sel: '#vTop', side: 'l', t: '这是你的渔村', x: '村库、存鱼、村民、民心、声誉，右边的小标签是本季预计的变化。建设越多，村子会从木屋小渔村长成渔镇、海滨小城。' },
-  { sel: '#vSide', side: 'r', t: '定政策、看预测', x: '每一行选一项。把鼠标移到选项或建筑上，下面的预测会告诉你会发生什么。' },
-  { sel: '#vRun', side: 'b', t: '准备好了就开始本季', x: '一共 16 季、四年。每一季结束，海和村子都会给你回应。' },
+  { sel: '#hud', side: 'l', t: '这是门前的海', x: '箭头是本季预计的变化，带 ? 表示还没潜下去调查。四年后，珊瑚和鱼群要守在竖线（55%）以上。' },
+  { sel: '#vTop', side: 'l', t: '这是你的渔村', x: '右边的小标签是本季预计变化的精确数字。建设越多，村子会从小渔村长成渔镇、海滨小城。' },
+  { sel: '#vSide', side: 'r', t: '定政策、看预测', x: '每行选一项：左边收益高、风险大，右边稳妥。鼠标移到选项或建筑上，预测会先算给你看。' },
+  { sel: '#vDive', side: 'l', t: '潜下去', x: '海面上的小标记是水下要做的事：调查、清长棘海星、捡垃圾。点标记或这个按钮直接潜到那里。' },
+  { sel: '#vRun', side: 'b', t: '准备好了就开始本季', x: '一共 16 季、四年。每季结束会有季报。' },
 ];
 let coachI = -1, coachDone = false;
 function showCoach(i){
@@ -259,6 +260,7 @@ function showCoach(i){
   if(c.side === 'l'){ co.style.left = (rc.right + 14) + 'px'; co.style.top = (rc.top + 6) + 'px'; }
   else if(c.side === 'r'){ co.style.left = (rc.left - w - 18) + 'px'; co.style.top = (rc.top + 60) + 'px'; }
   else { co.style.left = (rc.right - w - 10) + 'px'; co.style.top = (rc.top - co.offsetHeight - 16) + 'px'; }
+  { const h = co.offsetHeight; co.style.top = Math.max(10, Math.min(parseFloat(co.style.top), innerHeight - h - 10)) + 'px'; co.style.left = Math.max(10, Math.min(parseFloat(co.style.left), innerWidth - w - 10)) + 'px'; }   // keep the tip on screen
   const ring = $('ring'); Object.assign(ring.style, { left: (rc.left - 4) + 'px', top: (rc.top - 4) + 'px', width: (rc.width + 8) + 'px', height: (rc.height + 8) + 'px' }); ring.classList.add('on');
 }
 $('coach').querySelector('button').addEventListener('click', () => showCoach(coachI + 1));
