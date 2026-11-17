@@ -127,7 +127,7 @@ function renderFocus(){
 }
 function updateHoverPick(){
   if(mode !== 'village' || zoom || unzoom || hotMark || !['plan', 'report', 'over'].includes(state) || $('village').classList.contains('modal')){ if(hoverPick){ hoverPick = null; $('bTag').classList.remove('on'); } return; }
-  const p = pickBuilding(mouseVX, mouseVY);
+  const p = underUI(mouseVX, mouseVY) ? null : pickBuilding(mouseVX, mouseVY);
   const key = p ? p.k + p.i + ':' + lvOf(V, p.k, p.i) : '';
   if(p !== hoverPick || key !== hoverT){ hoverPick = p; hoverT = key;
     if(p){ const b = BUILD.find(x => x.k === p.k); $('bTag').innerHTML = `${b.name} · Lv ${lvOf(V, p.k, p.i)}<small>${focusOn === p ? '在左下角的卡片里升级' : '点击查看、升级'}</small>`; $('bTag').classList.add('on'); }
@@ -136,6 +136,16 @@ function updateHoverPick(){
   renderer.domElement.style.cursor = p ? 'pointer' : '';
 }
 
+// screen rectangles covered by the interface: world markers never show (or take the hover) underneath them
+let uiRects = [], uiRectT = 0;
+const UI_IDS = ['hud', 'vTop', 'vSide', 'vClock', 'vBottom', 'vEvent', 'vPrompt', 'vReport', 'montage', 'bInfo', 'sysBtn', 'coach', 'toast'];
+function underUI(x, y){
+  if(time - uiRectT > 0.25){ uiRectT = time; uiRects = [];
+    for(const id of UI_IDS){ const el = $(id); if(!el) continue; const cs = getComputedStyle(el); if(cs.display === 'none' || +cs.opacity < 0.1 || cs.visibility === 'hidden') continue;
+      const r = el.getBoundingClientRect(); if(r.width > 0 && r.height > 0) uiRects.push([r.left - 12, r.top - 12, r.right + 12, r.bottom + 12]); } }
+  for(const r of uiRects) if(x > r[0] && x < r[2] && y > r[1] && y < r[3]) return true;
+  return false;
+}
 function updateMarks(){
   const canClick = ['plan', 'report', 'over'].includes(state) && !zoom;
   let best = null, bd = 70;
@@ -145,10 +155,10 @@ function updateMarks(){
       const p = pB.copy(m.pos()).project(camera);
       if(p.z < 1 && Math.abs(p.x) < 0.97 && Math.abs(p.y) < 0.97){
         m.sx = (p.x*0.5 + 0.5)*innerWidth; m.sy = (-p.y*0.5 + 0.5)*innerHeight;
-        m.vis = !!portalVisibleAt(m.sx, m.sy);
+        m.vis = !underUI(m.sx, m.sy) && !!portalVisibleAt(m.sx, m.sy);
       }
     }
-    if(m.vis){ const d = Math.hypot(m.sx - mouseVX, m.sy - mouseVY); if(d < bd){ bd = d; best = m; } }
+    if(m.vis && !underUI(mouseVX, mouseVY)){ const d = Math.hypot(m.sx - mouseVX, m.sy - mouseVY); if(d < bd){ bd = d; best = m; } }
   }
   hotMark = best;
   const pulse = V.season <= 1 && state === 'plan' && (time % 7) < 1.4;

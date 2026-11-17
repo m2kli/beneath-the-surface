@@ -2,7 +2,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#02131c;color:#eaf6f8;
   font-family:Inter,"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;}
 canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
 .serif{font-family:"Cormorant Garamond","Noto Serif SC","Songti SC",serif}
-#hud{position:fixed;left:30px;top:26px;opacity:0;transition:opacity 1.2s;pointer-events:none;
+#hud{position:fixed;z-index:6;left:30px;top:26px;opacity:0;transition:opacity 1.2s;pointer-events:none;
   text-shadow:0 1px 10px rgba(0,20,30,.7)}
 #hud.on{opacity:1}
 #hud .lbl{font-size:10px;letter-spacing:.36em;text-transform:uppercase;opacity:.75}
@@ -87,7 +87,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:cros
 #ptr.poi #ptrDist{color:#d8fbff}
 #fade{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 40%,#bfeff2,#3aa7b8 60%,#0b4c5e);opacity:0;pointer-events:none;transition:opacity .6s;z-index:20}
 #fade.on{opacity:1}
-#village{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .8s;color:#1d2b2f;font-size:13px}
+#village{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .8s;color:#1d2b2f;font-size:13px}
 #village.on{opacity:1}
 #village.over #vSide,#village.over #vBottom{display:none}
 #village .panel{position:absolute;pointer-events:auto;background:rgba(255,255,252,.72);backdrop-filter:blur(14px) saturate(1.2);
@@ -253,18 +253,23 @@ body.vmode #hud{top:var(--hudTop, 300px)}
 .tier small{color:var(--muted);font-size:10px;white-space:nowrap}
 body:not(.vmode) #hud{background:var(--glass);border:1px solid var(--glass-edge);backdrop-filter:blur(8px);color:#EAF6F8}
 #hud .lbl{display:none}
-#hud .m{display:grid;grid-template-columns:30px 1fr 38px;align-items:center;gap:8px;font-size:12px;margin:7px 0 0;opacity:1;letter-spacing:0;text-transform:none;cursor:help}
+#hud .m{display:grid;grid-template-columns:30px 1fr 34px 30px;align-items:center;gap:8px;font-size:12px;margin:7px 0 0;opacity:1;letter-spacing:0;text-transform:none;cursor:help}
 #hud .m span{width:auto}
 #hud .m i{position:relative;display:block;width:auto;height:8px;border-radius:4px;background:rgba(43,58,58,.12);overflow:visible}
 body:not(.vmode) #hud .m i{background:rgba(255,255,255,.16)}
 #hud .m b{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--lagoon);box-shadow:none;transition:width .8s,background .5s}
 #hud .m b.mid{background:var(--gold)} #hud .m b.low{background:var(--coral)}
-#hud .m u{position:absolute;top:0;bottom:0;border-radius:4px;opacity:.85;transition:left .35s,width .35s;
-  background:repeating-linear-gradient(45deg,rgba(43,58,58,.35) 0 2px,transparent 2px 5px)}
-#hud .m u.dn{background:repeating-linear-gradient(45deg,rgba(233,118,91,.75) 0 2px,transparent 2px 5px)}
 #hud .m em{position:absolute;left:55%;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:currentColor;opacity:.35}
 #hud .m var{font:600 12px Inter,sans-serif;font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
 #hud .hint{font-size:10px;color:var(--muted);margin-top:8px;line-height:1.4}
+#hud .hint b{color:var(--ink)}
+/* change arrows: one language everywhere. green up, red down, more arrows = bigger change, ? = not surveyed */
+.tr{font:700 10px/1 Inter,sans-serif;letter-spacing:-1.5px;white-space:nowrap;text-align:left;border-radius:4px;padding:2px 1px}
+.tr .up{color:#1d8a5a}.tr .dn{color:#c4553b}.tr .eq{color:#9a9488;letter-spacing:0}
+.tr .q{color:#8a8478;font-size:10px;margin-left:2px;letter-spacing:0}
+.tr.pv{background:#FFF3D6}
+body:not(.vmode) #hud .tr{display:none}
+.tiles .oc .tr{font-size:8px}.tiles .oc small{font:500 10px Inter,sans-serif;color:var(--muted);text-align:right}
 body:not(.vmode) #hud .hint{display:none}
 #objective{margin-top:10px;font-size:12px;line-height:1.5;max-width:none}
 #objective:empty{display:none}
@@ -337,7 +342,6 @@ body:not(.vmode) #hud .hint{display:none}
 #vPredict .sea .q{font-style:normal;opacity:.55;margin-left:1px}
 #vPredict .sea small{display:block;font-size:10.5px;line-height:1.45;color:var(--muted);margin-top:3px}
 #vPredict .sea small.warn{color:var(--coral-d)}
-#hud .m u.fz{opacity:.6;outline:1px dashed rgba(43,58,58,.5);outline-offset:-1px}
 #vDive{position:relative}
 #vDive.ping::after{content:'';position:absolute;top:8px;right:14px;width:8px;height:8px;border-radius:50%;background:#ffa83a;animation:seaPing 1.8s infinite}
 @keyframes seaPing{0%{box-shadow:0 0 0 0 rgba(255,168,58,.7)}100%{box-shadow:0 0 0 10px rgba(255,168,58,0)}}
@@ -365,7 +369,7 @@ body:not(.vmode) #hud .hint{display:none}
 .tiles small{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
 .tiles b{display:block;font:600 20px Inter,sans-serif;margin-top:3px;font-variant-numeric:tabular-nums}
 .tiles em{font:600 12px Inter,sans-serif;font-style:normal}
-.tiles .oc{display:grid;grid-template-columns:1fr 12px 34px;align-items:center;font-size:11px;margin-top:3px;color:var(--muted)}
+.tiles .oc{display:grid;grid-template-columns:1fr 22px 30px 34px;align-items:center;font-size:11px;margin-top:3px;color:var(--muted)}
 .tiles .oc b{font:600 12px Inter,sans-serif;margin:0;text-align:right;color:var(--ink)}
 .vcard .notes{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:5px}
 .vcard .notes li{display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.5;padding:6px 8px;border-radius:9px;background:rgba(246,239,226,.8)}

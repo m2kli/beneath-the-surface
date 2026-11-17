@@ -71,7 +71,11 @@ function goDive(kind){ fade(() => enterDive(kind)); }
 
 // ---- village UI
 const fmt = x => (x >= 0 ? '+' : '−') + Math.abs(Math.round(x));
-const trend = (a, b) => b > a + 0.008 ? '<span class="pos">▲</span>' : b < a - 0.008 ? '<span class="negc">▼</span>' : '<span style="opacity:.5">•</span>';
+// change arrows, the same everywhere: green up, red down; one to three arrows for small, clear, large; ? where it is not known
+const arrows = (d, unsure) => { const m = Math.abs(d), n = m < 0.004 ? 0 : m < 0.015 ? 1 : m < 0.04 ? 2 : 3;
+  return (n ? `<span class="${d > 0 ? 'up' : 'dn'}">${(d > 0 ? '▲' : '▼').repeat(n)}</span>` : '<span class="eq">–</span>') + (unsure ? '<span class="q">?</span>' : ''); };
+// after the fact (the report): measured, so arrows and the exact change
+const trend = (a, b) => `<span class="tr">${arrows(b - a)}</span><small>${Math.abs(b - a) < 0.0005 ? '' : (b > a ? '+' : '−') + (Math.abs(b - a)*100).toFixed(1)}</small>`;
 const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
 const POL_ICON = { fish: 'fish', tour: 'mask', zone: 'shield', waste: 'drop', work: 'clock', tax: 'coin' };
 const BUILD_INFO = {
@@ -181,28 +185,26 @@ function renderForecast(mutate, label){
   if(!mutate){
     setDelta('dMoney', v.money - V.money); setDelta('dFood', v.food - V.food); setDelta('dPop', v.pop - V.pop); setDelta('dMorale', v.morale - V.morale); setDelta('dRep', (v.rep - V.rep)*100);
   }
-  setGhostR('gCoral', eco.coral, lo.coral, hi.coral); setGhost('gWater', eco.clar, e.clar); setGhostR('gFish', eco.fish, lo.fish, hi.fish); setGhostR('gPel', eco.pelagic ?? 1, lo.pelagic ?? 1, hi.pelagic ?? 1);
+  // the sea is only ever shown as arrows: its luck this season is unknown until someone dives and surveys
+  const pv = !!mutate; setTrend('tCoral', eco.coral, lo.coral, hi.coral, pv); setTrend('tWater', eco.clar, e.clar, e.clar, pv); setTrend('tFish', eco.fish, lo.fish, hi.fish, pv); setTrend('tPel', eco.pelagic ?? 1, lo.pelagic ?? 1, hi.pelagic ?? 1, pv);
 }
-// the end-of-season sea as the village sees it: exact where someone dived and looked, a range where nobody did
+// what the village knows about the sea this season: the jobs waiting down there and the trouble it was told about
 function seaRow(e, lo, hi, S){
   if(!S) return '';
-  const pc = x => Math.round(x*100), L = seaLeft(S), nS = SEA_KEYS.filter(k => S.seen[k]).length;
-  const cell = (lab, k, a, l, h) => `<div><span>${lab}</span><b>${!S.seen[k] && pc(h) !== pc(l) ? `${pc(l)}–${pc(h)}%<i class="q">?</i>` : pc(a) + '%'}</b></div>`;
-  const notes = [];
-  if(nS < 3) notes.push(`<small>${S.dived ? `还有 ${3 - nS} 处没调查` : '这一季还没人下去看过'}：潜下去调查，这几个数才准。</small>`);
-  if(S.dived && (L.cots || L.trash)) notes.push(`<small class="warn">${[L.cots ? `礁上还有 ${L.cots} 只长棘海星` : '', L.trash ? `${L.trash} 处垃圾` : ''].filter(Boolean).join('、')}没清理。</small>`);
-  if(S.ev && S.evFound && S.evDone && !S.evFix) notes.push(`<small class="warn">${SEA_EV[S.ev].n}没处理：季末${seaDmg(SEA_EV[S.ev])}。</small>`);
-  if(S.ev && S.evFix) notes.push(`<small>${SEA_EV[S.ev].n}已经处理了。</small>`);
-  return `<div class="sea"><div class="sh">${ic('wave')}季末的海</div><div class="sc">${cell('珊瑚', 'coral', e.coral, lo.coral, hi.coral)}${cell('鱼群', 'fish', e.fish, lo.fish, hi.fish)}${cell('远洋', 'pel', e.pelagic ?? 1, lo.pelagic ?? 1, hi.pelagic ?? 1)}</div>${notes.join('')}</div>`;
+  const L = seaLeft(S), nS = SEA_KEYS.filter(k => S.seen[k]).length, notes = [];
+  if(nS < 3) notes.push(`<small>${S.dived ? `调查 ${nS}/3` : '还没潜下去调查'} · 海洋箭头带 ? 的看不准</small>`);
+  if(S.dived && (L.cots || L.trash)) notes.push(`<small class="warn">${[L.cots ? `长棘海星 ${L.cots} 只` : '', L.trash ? `垃圾 ${L.trash} 处` : ''].filter(Boolean).join(' · ')} 没清理</small>`);
+  if(S.ev && S.evFound && S.evDone && !S.evFix) notes.push(`<small class="warn">${SEA_EV[S.ev].n}没处理：季末${seaDmg(SEA_EV[S.ev])}</small>`);
+  if(S.ev && S.evFix) notes.push(`<small>${SEA_EV[S.ev].n}已处理</small>`);
+  return notes.length ? `<div class="sea"><div class="sh">${ic('mask')}水下</div>${notes.join('')}</div>` : '';
 }
-function setGhostR(id, a, lo, hi){
-  if(Math.abs(hi - lo) < 0.003){ setGhost(id, a, (lo + hi)/2); $(id).classList.remove('fz'); return; }
-  const el = $(id); if(mode !== 'village'){ el.style.width = '0'; return; }
-  const l = Math.min(a, lo), r = Math.max(a, hi);
-  el.style.left = (l*100).toFixed(1) + '%'; el.style.width = ((r - l)*100).toFixed(1) + '%'; el.classList.toggle('dn', (lo + hi)/2 < a); el.classList.add('fz');
+// the ocean card's arrow for one meter; lo/hi are the two ends of what the village can know
+function setTrend(id, a, lo, hi, preview){
+  const el = $(id); if(!el) return; if(mode !== 'village'){ el.innerHTML = ''; return; }
+  const dl = lo - a, dh = hi - a, unsure = Math.abs(dh - dl) > 0.003;
+  el.innerHTML = unsure && Math.sign(dl) !== Math.sign(dh) && Math.max(Math.abs(dl), Math.abs(dh)) > 0.004 ? '<span class="eq">?</span>' : arrows((dl + dh)/2, unsure);
+  el.classList.toggle('pv', preview);
 }
-function setGhost(id, a, b){ const el = $(id); if(mode !== 'village'){ el.style.width = '0'; return; }
-  el.style.left = (Math.min(a, b)*100).toFixed(1) + '%'; el.style.width = (Math.abs(b - a)*100).toFixed(1) + '%'; el.classList.toggle('dn', b < a); }
 $('vTabs').addEventListener('click', e => { const bt = e.target.closest('button'); if(bt && bt.dataset.t){ vTab = bt.dataset.t; renderVillageUI(); } });
 function build(k){
   const b = BUILD.find(x => x.k === k); if(state !== 'plan' || V.money < b.cost || (V[KEY[k]] || 0) >= maxOf(V, k) || (b.need && !V[KEY[b.need]])) return;

@@ -186,11 +186,11 @@ function seaDebrief(back){
 function showSeaEvent(back){
   const S = V.sea, E = SEA_EV[S.ev], T = SEA_EV_TXT[S.ev];
   setState('event'); $('village').classList.add('modal'); $('vReport').classList.remove('on');
-  const opts = [{ t: T.fixT, d: T.fixD(E) }, { t: '不管它', d: `季末${seaDmg(E)}。` }];
+  const opts = [{ t: '不管它', d: `季末${seaDmg(E)}。`, fix: false }, { t: T.fixT, d: T.fixD(E), fix: true }];   // left: free but risky, right: costs money, safe
   $('vEvent').innerHTML = `<div class="kicker crisis">${seasonName(S.season)} · 水下发现</div><h3>${T.t}</h3><p>${T.x}</p>
     <div class="opts">${opts.map((o, i) => `<button data-i="${i}"><b>${o.t}</b><span>${o.d}</span></button>`).join('')}</div>`;
   $('vEvent').querySelectorAll('button').forEach(b => b.onclick = () => { S.evDone = true;
-    if(+b.dataset.i === 0){ S.evFix = true; V.money += E.gain - E.fix; }
+    if(opts[+b.dataset.i].fix){ S.evFix = true; V.money += E.gain - E.fix; }
     $('vEvent').classList.remove('on'); setState(back);
     if(back === 'report') $('vReport').classList.add('on'); else $('village').classList.remove('modal');
     chime(3); renderVillageUI(); });
