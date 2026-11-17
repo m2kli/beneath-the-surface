@@ -58,3 +58,15 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 7. **Night underwater.** A dive keeps the shore's time of day. At night: fluorescent coral, glowing jellyfish, bioluminescent plankton, a shimmering wake.
 
 **Needs a human eye:** whether the arrow sizes (thresholds 0.4% / 1.5% / 4% per season) feel right, and whether the night is dark enough.
+
+## Round 5: sweep after the feedback changes
+
+- **Greedy-plan bot:** played to an early "村子空了" (overtime and high tax wreck morale), as expected for that plan. No UI issues.
+- **Screen sizes:** 1280×720 plan and report screens have no overlaps and nothing off screen.
+  - Found and fixed: the ocean tile in the report wrapped its labels ("珊/瑚") after the arrow column was added.
+- **Found and fixed:** underwater task markers showed on the title screen, because the village sits behind it in plan state. Both marker types now wait for the game to start, and hide while the menu is open.
+- **Event cards:** options now sit side by side (risky or free on the left, paid and safe on the right), matching the policy rows.
+- **Save/load:** the season's hidden sea (surveys, cleared starfish) survives a reload and "继续游戏". The arrows lose their `?` after surveying. Hovering a policy option previews the ocean arrows (highlighted).
+- **Performance:** the village frame was 24 ms. `updateMarks` raycast the dense water meshes once per "tap to become" marker (38 × 0.4 ms). It now uses a ray-box test against the water block: the village frame is ~9 ms, the dive ~6 ms.
+- **Balance baseline regenerated** (model numbers unchanged; the suite gained the goal-aware `careful` bot): careful bot 82% good endings without diving, 87% diving every season.
+- **Green plan, diving every season:** 16 seasons, 16 dives, 73 underwater tasks, ending "两边都撑过来了". No issues.
