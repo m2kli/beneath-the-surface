@@ -209,7 +209,7 @@ function seaMarkItems(S){
   return items;
 }
 function updateSeaMarks(){
-  const S = V.sea, show = mode === 'village' && !!S && ['plan', 'report'].includes(state) && !zoom && !unzoom && !$('village').classList.contains('modal');
+  const S = V.sea, show = mode === 'village' && !!S && document.body.classList.contains('started') && !$('intro').classList.contains('on') && !sysOpen && ['plan', 'report'].includes(state) && !zoom && !unzoom && !$('village').classList.contains('modal');
   if(!show){ for(const el of seaMk.els) el.classList.remove('on'); return; }
   if(sea3.seed !== S.seed) layoutSea(S);
   if(time - seaMk.t > 0.5){ seaMk.t = time; seaMk.list = seaMarkItems(S); }

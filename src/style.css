@@ -277,7 +277,7 @@ body:not(.vmode) #hud .m i{background:rgba(255,255,255,.16)}
 .tr .q{color:#8a8478;font-size:10px;margin-left:2px;letter-spacing:0}
 .tr.pv{background:#FFF3D6}
 body:not(.vmode) #hud .tr{display:none}
-.tiles .oc .tr{font-size:8px}.tiles .oc small{font:500 10px Inter,sans-serif;color:var(--muted);text-align:right}
+.tiles .oc .trc{display:flex;align-items:center;justify-content:flex-end;gap:3px}.tiles .oc .tr{font-size:8px}.tiles .oc small{font:500 10px Inter,sans-serif;color:var(--muted)}
 body:not(.vmode) #hud .hint{display:none}
 #objective{margin-top:10px;font-size:12px;line-height:1.5;max-width:none}
 #objective:empty{display:none}
@@ -381,7 +381,7 @@ body:not(.vmode) #hud .hint{display:none}
 .tiles small{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
 .tiles b{display:block;font:600 20px Inter,sans-serif;margin-top:3px;font-variant-numeric:tabular-nums}
 .tiles em{font:600 12px Inter,sans-serif;font-style:normal}
-.tiles .oc{display:grid;grid-template-columns:1fr 22px 30px 34px;align-items:center;font-size:11px;margin-top:3px;color:var(--muted)}
+.tiles .oc{display:grid;grid-template-columns:auto 1fr 36px;gap:4px;white-space:nowrap;align-items:center;font-size:11px;margin-top:3px;color:var(--muted)}
 .tiles .oc b{font:600 12px Inter,sans-serif;margin:0;text-align:right;color:var(--ink)}
 .vcard .notes{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:5px}
 .vcard .notes li{display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.5;padding:6px 8px;border-radius:9px;background:rgba(246,239,226,.8)}

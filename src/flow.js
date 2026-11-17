@@ -75,7 +75,7 @@ const fmt = x => (x >= 0 ? '+' : '−') + Math.abs(Math.round(x));
 const arrows = (d, unsure) => { const m = Math.abs(d), n = m < 0.004 ? 0 : m < 0.015 ? 1 : m < 0.04 ? 2 : 3;
   return (n ? `<span class="${d > 0 ? 'up' : 'dn'}">${(d > 0 ? '▲' : '▼').repeat(n)}</span>` : '<span class="eq">–</span>') + (unsure ? '<span class="q">?</span>' : ''); };
 // after the fact (the report): measured, so arrows and the exact change
-const trend = (a, b) => `<span class="tr">${arrows(b - a)}</span><small>${Math.abs(b - a) < 0.0005 ? '' : (b > a ? '+' : '−') + (Math.abs(b - a)*100).toFixed(1)}</small>`;
+const trend = (a, b) => `<span class="trc"><span class="tr">${arrows(b - a)}</span><small>${Math.abs(b - a) < 0.0005 ? '' : (b > a ? '+' : '−') + (Math.abs(b - a)*100).toFixed(1)}</small></span>`;
 const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
 const POL_ICON = { fish: 'fish', tour: 'mask', zone: 'shield', waste: 'drop', work: 'clock', tax: 'coin' };
 const BUILD_INFO = {

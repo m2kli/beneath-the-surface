@@ -147,7 +147,7 @@ function underUI(x, y){
   return false;
 }
 function updateMarks(){
-  const canClick = ['plan', 'report', 'over'].includes(state) && !zoom;
+  const canClick = ['plan', 'report', 'over'].includes(state) && !zoom && document.body.classList.contains('started') && !sysOpen;
   let best = null, bd = 70;
   for(const m of MARKS){
     m.vis = false;
