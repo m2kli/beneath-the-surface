@@ -1,0 +1,11 @@
+{
+  "name": "beneath-the-surface",
+  "private": true,
+  "description": "海面之下 — a fishing village and the reef it lives on (three.js)",
+  "type": "module",
+  "scripts": {
+    "serve": "python -m http.server 8771",
+    "balance": "bash tools/suite.sh",
+    "stress": "node tools/stress.mjs . all 3000"
+  }
+}

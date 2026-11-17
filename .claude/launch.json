@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "ocean-demo-2",
+      "name": "ocean",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8771"],
+      "runtimeArgs": ["-m", "http.server", "8771", "--directory", "F:/ocean"],
       "port": 8771,
       "autoPort": false
     }
