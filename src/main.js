@@ -363,12 +363,20 @@ function frame(){
   const yC = player.yaw + camYawOff, pC = (avatar.kind === 'jelly' ? camPitch*0.6 : camPitch*0.7 + player.pitch*0.3) - 0.22;
   const vdir = pA.set(Math.sin(yC)*Math.cos(pC), Math.sin(pC), Math.cos(yC)*Math.cos(pC));
   const focus = pB.copy(player.pos); focus.y += ch*0.35;
-  tmp.copy(focus).addScaledVector(vdir, -(cd + player.speed*0.12));
-  tmp.y = clamp(tmp.y, topAt(tmp.x, tmp.z) + 1.2, SURFACE - 0.8);
+  // stay in the water: over the shallows or the beach, come in closer rather than rise out through the surface
+  // stay in the water: over the shallows or the beach, swing round toward deeper water, and only then come in closer
+  const back0 = cd + player.speed*0.12, wet = () => topAt(tmp.x, tmp.z) + 2.2 < SURFACE - 0.8;
+  tmp.copy(focus).addScaledVector(vdir, -back0);
+  if(!wet()){ let ok = false;
+    for(const dy of [0.45, -0.45, 0.9, -0.9, 1.4, -1.4, 2.0, -2.0]){ const y2 = yC + dy;
+      tmp.set(focus.x - Math.sin(y2)*Math.cos(pC)*back0, focus.y - Math.sin(pC)*back0, focus.z - Math.cos(y2)*Math.cos(pC)*back0); if(wet()){ ok = true; break; } }
+    for(let back = back0*0.8; !ok && back > 3; back *= 0.8){ tmp.copy(focus).addScaledVector(vdir, -back); ok = wet(); } }
+  tmp.y = Math.min(Math.max(tmp.y, topAt(tmp.x, tmp.z) + 1.2), SURFACE - 0.8);
   const glide = swapT < 1.4 ? 1.4 + swapT*3.4 : 6;
   camPos.lerp(tmp, 1 - Math.exp(-dt*(diveIntroT < 2.5 ? 1.2 + diveIntroT : glide)));
-  tmp2.copy(focus).addScaledVector(vdir, 8);
+  tmp2.copy(focus).sub(tmp).normalize().multiplyScalar(8).add(focus);   // look past the animal from wherever the camera ended up (the same as vdir unless it swung away from the shore)
   camLook.lerp(tmp2, 1 - Math.exp(-dt*(diveIntroT < 2.5 ? 1.0 + diveIntroT : glide*1.3)));
+  camPos.y = Math.min(Math.max(camPos.y, topAt(camPos.x, camPos.z) + 0.6), SURFACE - 0.8);   // the eased camera can cut a corner: never out of the water or into the sand
   camera.position.copy(camPos); camera.lookAt(camLook);
   camera.fov += ((60 + (player.speed - 8.5)*1.1*(avatar.kind === 'school' ? 0.5 : 1)) - camera.fov) * Math.min(1, dt*3);
   if(window.__camOv){ camera.position.copy(window.__camOv.p); camera.lookAt(window.__camOv.t); }   // debug: frame a shot by hand

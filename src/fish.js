@@ -240,7 +240,7 @@ function updateFish(pool, dt){
     for(let q=0;q<NPRED;q++){ const pr = PRED[q]; if(pr.sc === sc) continue;
       const qx = x - pr.x, qy = y - pr.y, qz = z - pr.z, qd2 = qx*qx + qy*qy + qz*qz;
       if(qd2 < pr.r*pr.r){ const qd = Math.sqrt(qd2) + 1e-4, w = (pr.r - qd)*pr.k/qd; fx += qx*w; fy += qy*w; fz += qz*w; } }
-    if(y < 26){ const h = topAt(x, z) + (S.kind === 'home' ? 0.5 : 1.8); if(y < h) fy += (h - y)*9; }
+    const gy = topAt(x, z), h = gy + (S.kind === 'home' ? 0.5 : 1.8); if(y < h) fy += (h - y)*9;   // the seabed, wherever it is: in the shallows it is far above the deep reef
     if(y > SURFACE - 3) fy -= (y - SURFACE + 3)*9;
     vx += fx*dt; vy += fy*dt; vz += fz*dt; vy *= 1 - dt*0.8;
     const base = S.ctrl ? 0.8 : S.kind === 'home' ? 1.2 : S.kind === 'hover' ? 0.6 : S.kind === 'graze' ? 1.3 : S.attack ? 6 : 3.2;
@@ -248,7 +248,7 @@ function updateFish(pool, dt){
     vx *= k; vy *= k; vz *= k;
     V[i3] = vx; V[i3+1] = vy; V[i3+2] = vz;
     { const i4 = i3/3*4; SD[i4] = (SD[i4] + dt*(5 + sp*k*1.2)/Math.sqrt(SD[i4 + 1])) % 6283.1853; }   // tail-beat phase: speeds up and slows down smoothly
-    P[i3] = x + vx*dt; P[i3+1] = y + vy*dt; P[i3+2] = z + vz*dt;
+    P[i3] = x + vx*dt; P[i3+1] = Math.min(Math.max(y + vy*dt, gy + 0.25), SURFACE - 0.6); P[i3+2] = z + vz*dt;   // never through the sand, never out of the water
   }
   pool.geo.attributes.aPos.needsUpdate = true; pool.geo.attributes.aDir.needsUpdate = true; pool.geo.attributes.aSeed.needsUpdate = true;
 }
