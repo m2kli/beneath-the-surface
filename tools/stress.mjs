@@ -77,6 +77,10 @@ const bots = {
   // looks at next season's forecast, cares about the sea too (the way a careful first-time player reads the forecast panel)
   myopicBalanced: () => ({ policy(G){ return bestBy(G, r => r.v.money*0.3 + r.v.morale + 120*(r.e.coral + r.e.fish + (r.e.pelagic ?? 1)*0.5)); }, build: (G) => G.eco.coral < 0.6 ? ['nursery', 'house'] : G.V.season < 6 ? ['house', 'shop', 'school', 'cold'] : ['house', 'shop', 'up:shop', 'harbor', 'whale', 'up:house', 'research', 'up:harbor', 'offshore'], keep: 35 }),
   developer: () => ({ policy(G){ return bestBy(G, r => r.v.money*0.6 + r.v.morale*0.8 + 60*(r.e.coral + r.e.fish + (r.e.pelagic ?? 1)*0.5)); }, build: (G) => ['house', 'up:house', 'shop', 'up:shop', 'harbor', 'offshore', 'whale', 'up:harbor', 'up:offshore', 'resort', 'up:resort', 'research', 'school', 'up:boat', 'cold', 'plant', 'up:plant'], keep: 15 }),
+  // the forecast reader who also watches the four-year goal lines: keeps coral and fish with a margin above 55%, pelagic above 40%
+  careful: () => ({ policy(G){ return bestBy(G, r => r.v.money*0.3 + r.v.morale + 120*(r.e.coral + r.e.fish + (r.e.pelagic ?? 1)*0.5)
+      - 900*(Math.max(0, 0.64 - r.e.coral) + Math.max(0, 0.62 - r.e.fish) + Math.max(0, 0.48 - (r.e.pelagic ?? 1))) - 4*Math.max(0, -r.v.money)); },
+    build: (G) => G.eco.coral < 0.6 ? ['nursery', 'house'] : G.V.season < 6 ? ['house', 'shop', 'school', 'cold', 'house'] : ['house', 'up:house', 'shop', 'plant', 'harbor', 'whale', 'house', 'research'] }),
   // keeps morale up at all costs
   pleaser: () => ({ policy(G){ return bestBy(G, r => r.v.morale*3 + Math.min(r.v.money, 50)*0.2); }, build: () => ['house', 'shop'] }),
   // protects the sea at all costs
@@ -97,7 +101,7 @@ if(MODE === 'all' || MODE === 'random'){
   console.log(`[随机玩家 ${NGAMES} 局] ${tally(ends)}\n   结束时村库 中位${Math.round(monies[monies.length >> 1])} 90分位${Math.round(monies[(monies.length*0.9)|0])} 最高${Math.round(monies[monies.length - 1])} · 村库曾超过1500的局 ${rich}`);
 }
 if(MODE === 'all' || MODE === 'bots'){
-  for(const name of ['myopicMoney', 'myopicBalanced', 'developer', 'pleaser', 'greenest']){
+  for(const name of ['myopicMoney', 'myopicBalanced', 'careful', 'developer', 'pleaser', 'greenest']){
     const ends = []; const sample = [];
     for(let i=0;i<(+process.argv[5] || 40);i++){ const r = playGame(bots[name](), newGame(), `${name}#${i} `); ends.push(r.end); if(i < 1) sample.push(r); }
     const g = sample[0].G; console.log(`[${name}] ${tally(ends)} | 例: 库${Math.round(g.V.money)} 心${g.V.morale} 人${g.V.pop} 珊${g.eco.coral.toFixed(2)} 鱼${g.eco.fish.toFixed(2)} 远洋${(g.eco.pelagic ?? 1).toFixed(2)} 发展${mod.devTier(g.V)} 港${g.V.harbor||0}远${g.V.offshore||0}鲸${g.V.whale||0}`);

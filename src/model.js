@@ -138,7 +138,7 @@ function simulateSeason(e0, v0, haul){
   const baseV = { open: shopW*14 + resW*30, limited: shopW*8 + resW*12, closed: 0 }[P.tour];
   const visitors = baseV*sf.tour*staff*(0.5 + v.rep)*(M.bloom ? 0.5 : 1)*(P.zone === 'wide' ? 0.9 : 1)*tierK;
   const whaleVis = P.tour === 'closed' ? 0 : whaleW*OFF.whaleV*e.pelagic*sf.tour*staff*(0.5 + v.rep)*tierK;
-  const price = P.tour === 'limited' ? 7*Math.pow(attract, 1.3)*[1, 1.15, 1.25, 1.35][schoolLv] : 3*(0.3 + attract);
+  const price = P.tour === 'limited' ? 7*Math.pow(attract, 1.3)*[1, 1.15, 1.25, 1.35][schoolLv] : 3*(0.3 + attract);   // open: volume at a low price that holds up even on a damaged reef; limited: a premium that only a beautiful reef earns
   const whalePrice = OFF.whaleP*(0.4 + 0.6*e.pelagic);
   const tourInc = visitors*price + whaleVis*whalePrice;
   const diverK = n('shop') ? Wl('shop', [1, 0.65, 0.45])/n('shop') : 1;          // trained divers at the bigger dive centres break less coral
@@ -233,7 +233,7 @@ function simulateSeason(e0, v0, haul){
     if(sea.E && sea.E.coral) r.coralWhy.push([sea.E.n, -sea.E.coral]); }
   r.sea = sea;
   Object.assign(r, { labor, need, staff, catchT, reefCatch, offCatch, sold, spoiled, fishPrice, fishInc, haul: haul || 0, tourInc, visitors, whaleVis, allVis, privCost, earn, tax, fee, gross, perCap, resInc,
-    pubTotal, moneyDelta: income - pubTotal, grant, wages, degraded, protect, restoreNeed, dMor, pop0, pop1: v.pop, cap, foodNeed, shortage, hungry, food: v.food, attract,
+    pubTotal, moneyDelta: income - pubTotal, eat, reserve, stock0: v0.food, grant, wages, degraded, protect, restoreNeed, dMor, pop0, pop1: v.pop, cap, foodNeed, shortage, hungry, food: v.food, attract,
     fishBefore, coralBefore, clarBefore, pelBefore, nutr, reefDmg, spawnHit, spring: v.season % 4 === 0 });
   return { e, v, r };
 }

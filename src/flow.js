@@ -94,7 +94,9 @@ function renderVillageUI(){
   $('vTurn').textContent = over ? `${SEASONS_PER_GAME} / ${SEASONS_PER_GAME}` : `${s + 1} / ${SEASONS_PER_GAME}`;
   $('vPips').innerHTML = Array.from({ length: SEASONS_PER_GAME }, (_, i) => `${i && i % 4 === 0 ? '<i class="gap"></i>' : ''}<i class="${i < s || over ? 'done' : i === s ? 'now' : ''}" title="${seasonName(i)}"></i>`).join('');
   $('vMoney').textContent = Math.round(V.money); $('vMoney').style.color = V.money < 0 ? 'var(--coral-d)' : '';
-  $('vFood').innerHTML = `${V.food.toFixed(0)}<small> 吨</small>`;
+  $('vFood').innerHTML = `${V.food.toFixed(1)}<small> 吨</small>`;
+  { const cl = V.cold ? lvOf(V, 'cold', 0) : 0, need = V.pop*0.12, keep = cl ? need : need*0.3, price = 13*SEASON_FX[V.season % 4].price*[1, 1.1, 1.18][cl];
+    $('vFood').parentElement.dataset.tip = `存鱼 ${V.food.toFixed(1)} 吨。每季村民吃 ${need.toFixed(1)} 吨（${V.pop} 人 × 0.12），最多留 ${keep.toFixed(1)} 吨过季，其余按 ${price.toFixed(0)}/吨 卖出。留下的鱼每季坏 ${[35, 5, 3][cl]}%${cl ? '' : '（建冷库降到 5%）'}。不够吃时村库按 ${REC.food}/吨 进口。`; }
   $('vPop').innerHTML = `${V.pop}<small> / ${W(V, 'house', [4, 6, 8])}</small>`;
   $('vMorale').textContent = Math.round(V.morale); $('vMorale').style.color = V.morale < 30 ? 'var(--coral-d)' : '';
   $('vMoraleBar').style.width = V.morale + '%';
@@ -113,7 +115,7 @@ function renderVillageUI(){
     return `<div class="prow${lock ? ' locked' : ''}" data-k="${pl.k}"><div class="ph">${ic(POL_ICON[pl.k])}<b>${pl.name}</b>
       ${lock ? `<span class="tag">${ic('lock')}锁定 ${lock} 季</span>` : spring ? '<span class="tag">产卵季</span>' : ''}</div>
       <div class="pseg">${pl.opts.map(x => `<button data-k="${pl.k}" data-v="${x.v}" class="${x.v === cur ? 'on' : ''}" ${!plan || lock ? 'disabled' : ''}>${x.n}</button>`).join('')}</div>
-      <div class="pd">${pl.opts.map(x => `<span data-v="${x.v}" class="${x.v === cur ? 'show' : ''}">${x.d}${pl.k === 'fish' && V.prevPol && FISH_RANK[x.v] < FISH_RANK[V.prevPol.fish] ? ' <span class="warn">· 渔民会不满</span>' : ''}</span>`).join('')}</div></div>`; };
+      <div class="pd">${pl.opts.map(x => `<span data-v="${x.v}" class="${x.v === cur ? 'show' : ''}">${typeof x.d === 'function' ? x.d(V) : x.d}${pl.k === 'fish' && V.prevPol && FISH_RANK[x.v] < FISH_RANK[V.prevPol.fish] ? ' <span class="warn">· 渔民会不满</span>' : ''}</span>`).join('')}</div></div>`; };
   $('vPol').innerHTML = `<div class="pg">${ic('wave')}海</div>${POLICIES.filter(p => ['fish', 'zone', 'waste', 'tour'].includes(p.k)).map(row).join('')}
     <div class="pg v">${ic('house')}村</div>${POLICIES.filter(p => ['work', 'tax'].includes(p.k)).map(row).join('')}`;
   $('vPol').querySelectorAll('.pseg button').forEach(b => {
@@ -161,23 +163,24 @@ function renderForecast(mutate, label){
   const hl = (a, c) => mutate && Math.abs(a - c) > 0.05 ? ' class="hl"' : '';
   const warns = [];
   if(r.moneyDelta < -1.5){ const top = r.pub.slice().sort((a, b) => b[1] - a[1])[0];
-    warns.push(`村库每季 ${fmt(r.moneyDelta)}${top ? `，最大开支是「${top[0]}」${fmt(-top[1])}` : ''}${r.sold < 0.3 && r.tourInc < 1 ? '。鱼都被村民自己吃掉了，没有卖出去的就收不到税' : ''}。`); }
-  if(r.degraded > 0.15 && r.protect === 0) warns.push(V.pol.fish === 'industrial' ? '礁区受损。停止大规模捕捞并设立保护区，可以拿到海洋保护资助，也给村民修复礁区的工作。' : '礁区受损。设立保护区可以拿到海洋保护资助，闲着的村民也能去修复礁区。');
-  if(V.pol.fish === 'industrial' && V.trawlers > 0 && V.pol.zone !== 'wide' && eco.bait > 0.12 && !mutate) warns.push('拖网船会撞上礁区里的鱼群，你可以潜下去。');
-  if(r.spring && v.pol.fish !== 'ban' && r.spawnHit < 0.85) warns.push('产卵季捕鱼：明年的鱼会少一些。');
-  if(r.staff < 1) warns.push(`人手只够 ${Math.round(r.staff*100)}%，产出会打折。`);
-  if(r.shortage > 0.05) warns.push(r.hungry ? '粮食不够，村库也买不起：村民会挨饿。' : `粮食缺 ${r.shortage.toFixed(1)} 吨，要花村库的钱进口。`);
-  if(v.money < -60) warns.push('村库快见底了。低于 −100 村子会破产。');
-  if(v.morale < 30) warns.push('民心太低，会有人搬走。');
+    warns.push(`村库每季 ${fmt(r.moneyDelta)}${top ? `，最大开支是「${top[0]}」${fmt(-top[1])}` : ''}${r.sold < 0.3 && r.tourInc < 1 ? '。渔获全被村民吃掉，没有卖出的鱼就没有税' : ''}。`); }
+  if(r.degraded > 0.15 && r.protect === 0) warns.push(V.pol.fish === 'industrial' ? '礁区受损。停止大规模捕捞并设保护区，才有保护资助和修复工作。' : '礁区受损。设保护区就有保护资助，闲置村民可以去修复。');
+  if(V.pol.fish === 'industrial' && V.trawlers > 0 && V.pol.zone !== 'wide' && eco.bait > 0.12 && !mutate) warns.push('拖网船会撞上礁区鱼群。可以潜下去把鱼群赶开。');
+  if(r.spring && v.pol.fish !== 'ban' && r.spawnHit < 0.85) warns.push(`产卵季捕鱼：鱼群繁殖 −${Math.round((1 - r.spawnHit)*100)}%。`);
+  if(r.staff < 1) warns.push(`人手 ${Math.round(r.staff*100)}%：船和店按这个比例开工。`);
+  if(r.shortage > 0.05) warns.push(r.hungry ? `缺粮 ${r.shortage.toFixed(1)} 吨，村库买不起：村民挨饿，民心 −16。` : `缺粮 ${r.shortage.toFixed(1)} 吨，村库进口要花 ${Math.round(r.shortage*REC.food)}。`);
+  if(v.money < -60) warns.push('村库低于 −100 就破产。');
+  if(v.morale < 30) warns.push('民心低于 30：每季走 3 人。');
   const why = (r.grant > 0.5 ? `<div><span>村库 · 海洋保护资助</span><b class="pos">${fmt(r.grant - r.wages)}</b></div><div><span>村民 · 修复礁区的工资</span><b class="pos">${fmt(r.wages)}</b></div>` : '') + r.morale.map(([l, x]) => `<div><span>${l}</span><b class="${x < 0 ? 'negc' : 'pos'}">${fmt(x)}</b></div>`).join('') + r.pub.map(([l, x]) => `<div><span>村库 · ${l}</span><b class="negc">${fmt(-x)}</b></div>`).join('');
   const whyOpen = !!$('vPredict').querySelector('details[open]');
   $('vPredict').classList.toggle('preview', !!mutate);
   $('vPredict').innerHTML = `<div class="pt">${ic('info')}本季预测<span class="pv">${label || ''}</span></div>
     <div class="big"><div${hl(v.money, base.v.money)}><small>${ic('coin')}村库</small><b>${Math.round(V.money)} → ${Math.round(v.money)}</b></div>
       <div${hl(r.dMor, b.dMor)}><small>${ic('heart')}民心</small><b>${Math.round(V.morale)} → ${Math.round(v.morale)}</b></div></div>
-    <div class="sm"><div${hl(r.catchT, b.catchT)}><span>渔获</span><b>${r.catchT.toFixed(1)} 吨</b></div><div${hl(selfFed, b.foodNeed ? Math.round(Math.min(b.catchT, 99)/b.foodNeed*100) : 100)}><span>粮食自给</span><b class="${selfFed < 100 ? 'negc' : ''}">${selfFed}%</b></div>
-      <div${hl(r.visitors, b.visitors)}><span>游客</span><b>${Math.round(r.visitors)}</b></div><div${hl(r.perCap, b.perCap)}><span>人均生活</span><b>${r.perCap.toFixed(1)}</b></div>
+    <div class="sm"><div${hl(r.catchT, b.catchT)}><span>渔获</span><b>${r.catchT.toFixed(1)} 吨</b></div>
+      <div${hl(r.visitors, b.visitors)}><span>游客</span><b>${Math.round(r.visitors + r.whaleVis)}</b></div><div${hl(r.tourInc, b.tourInc)}><span>旅游收入</span><b>${Math.round(r.tourInc)}</b></div><div${hl(r.perCap, b.perCap)}><span>人均生活</span><b>${r.perCap.toFixed(1)}</b></div>
       <div${hl(r.staff, b.staff)}><span>人手</span><b class="${r.staff < 1 ? 'negc' : ''}">${Math.round(r.staff*100)}%</b></div><div${hl(v.pop, base.v.pop)}><span>村民</span><b>${V.pop} → ${v.pop}</b></div></div>
+    <div class="fl" data-tip="每季先给村民吃（每人 0.12 吨），再留一部分过季（没有冷库留三成口粮，有冷库留一整季），其余按鱼价卖出。留下的鱼没有冷库会坏 35%。">${ic('fish')}<span>鱼货</span><b>存 ${r.stock0.toFixed(1)} + 捕 ${r.catchT.toFixed(1)}</b><i>→</i><span>吃 ${r.eat.toFixed(1)}</span><span>卖 ${r.sold.toFixed(1)}×${r.fishPrice.toFixed(0)}=<b class="pos">${Math.round(r.sold*r.fishPrice)}</b></span><span>留 ${r.food.toFixed(1)}${r.spoiled > 0.05 ? `<em class="negc"> 坏 ${r.spoiled.toFixed(1)}</em>` : ''}</span></div>
     <div class="warns${warns.length ? '' : ' ok'}"${warns.length > 2 ? ` title="${warns.join(' / ')}"` : ''}>${warns.length ? warns.slice(0, 2).map(w => `<div>${ic('warn')}<span>${w}</span></div>`).join('') : `<div>${ic('good')}<span>暂时没有明显风险。</span></div>`}</div>
     ${seaRow(cur.e, lo, hi, SS)}
     <details${whyOpen ? ' open' : ''}><summary>为什么？ ▾</summary>${why || '<div>平平淡淡</div>'}</details>`;
@@ -196,7 +199,7 @@ function seaRow(e, lo, hi, S){
   if(S.dived && (L.cots || L.trash)) notes.push(`<small class="warn">${[L.cots ? `长棘海星 ${L.cots} 只` : '', L.trash ? `垃圾 ${L.trash} 处` : ''].filter(Boolean).join(' · ')} 没清理</small>`);
   if(S.ev && S.evFound && S.evDone && !S.evFix) notes.push(`<small class="warn">${SEA_EV[S.ev].n}没处理：季末${seaDmg(SEA_EV[S.ev])}</small>`);
   if(S.ev && S.evFix) notes.push(`<small>${SEA_EV[S.ev].n}已处理</small>`);
-  return notes.length ? `<div class="sea"><div class="sh">${ic('mask')}水下</div>${notes.join('')}</div>` : '';
+  return notes.length ? `<div class="sea">${ic('mask')}${notes.join('<i>·</i>')}</div>` : '';
 }
 // the ocean card's arrow for one meter; lo/hi are the two ends of what the village can know
 function setTrend(id, a, lo, hi, preview){
@@ -278,33 +281,33 @@ function autoTrawl(){
 }
 function showReport(r){
   const notes = [];   // [severity, text]
-  if(r.haul > 0) notes.push(['bad', `礁区上那一网拖网，带来了 ${Math.round(r.haul)} 的收入。`]);
-  if(r.spring && V.pol.fish !== 'ban' && r.spawnHit < 0.85) notes.push(['bad', '产卵季还在捕鱼，明年的鱼会少一些。']);
-  if(V.prevPol && V.prevPol.fish === 'ban') notes.push(['good', '渔船没有出海，鱼群得到了一季的繁殖时间。']);
-  if(r.staff < 1) notes.push(['bad', `人手只够 ${Math.round(r.staff*100)}%，船和店都没法满员开工。多建民居，或者让大家多干点。`]);
-  if(r.spoiled > 0.5) notes.push(['bad', `${r.spoiled.toFixed(1)} 吨鱼货放坏了。建一座冷库能存得更久。`]);
-  if(r.shortage > 0.05) notes.push(['bad', r.hungry ? '粮食不够，村库也买不起。村民在挨饿。' : `粮食不够，村库花钱进口了 ${r.shortage.toFixed(1)} 吨。`]);
-  if(eco.ghost > 0.3) notes.push(['bad', '遗落的渔网缠在礁上了。潜下去把它们割掉。']);
+  if(r.haul > 0) notes.push(['bad', `礁区拖网一网：收入 +${Math.round(r.haul)}。`]);
+  if(r.spring && V.pol.fish !== 'ban' && r.spawnHit < 0.85) notes.push(['bad', `产卵季捕鱼：鱼群繁殖 −${Math.round((1 - r.spawnHit)*100)}%。`]);
+  if(V.prevPol && V.prevPol.fish === 'ban') notes.push(['good', '休渔一季：鱼群没有捕捞损失。']);
+  if(r.staff < 1) notes.push(['bad', `人手 ${Math.round(r.staff*100)}%：船和店没有满员。`]);
+  if(r.spoiled > 0.5) notes.push(['bad', `${r.spoiled.toFixed(1)} 吨鱼货放坏${V.cold ? '' : '（冷库能把损耗从 35% 降到 5%）'}。`]);
+  if(r.shortage > 0.05) notes.push(['bad', r.hungry ? `缺粮 ${r.shortage.toFixed(1)} 吨，村库买不起：村民挨饿。` : `进口粮食 ${r.shortage.toFixed(1)} 吨，村库 −${Math.round(r.shortage*REC.food)}。`]);
+  if(eco.ghost > 0.3) notes.push(['bad', `幽灵网 ${Math.round(clamp(eco.ghost/0.25, 0, 4))} 张缠在礁上，每季鱼群 −${(5*eco.ghost).toFixed(1)}%。潜下去割掉。`]);
   if(r.sea && r.seaS){ const sea = r.sea, SS = r.seaS;
-    if(SS.gone.cots.length) notes.push(['good', `你清掉了 ${SS.gone.cots.length} 只长棘海星。`]);
-    if(sea.cl) notes.push(['bad', SS.dived ? `还有 ${sea.cl} 只长棘海星没清理，珊瑚 −${(sea.cl*SEA.cotsK*100).toFixed(1)}%。` : `礁上有 ${sea.cl} 只长棘海星，没人下去清理，珊瑚 −${(sea.cl*SEA.cotsK*100).toFixed(1)}%。污水越多，它们越多。`]);
-    if(SS.gone.trash.length) notes.push(['good', `你从排污口外捡走了 ${SS.gone.trash.length} 处垃圾。`]);
-    if(sea.tl) notes.push(['bad', `排污口外有 ${sea.tl} 处垃圾没人捡，鱼群和声誉都受了点影响。`]);
+    if(SS.gone.cots.length) notes.push(['good', `清掉长棘海星 ${SS.gone.cots.length} 只。`]);
+    if(sea.cl) notes.push(['bad', `长棘海星 ${sea.cl} 只没清理：珊瑚 −${(sea.cl*SEA.cotsK*100).toFixed(1)}%。`]);
+    if(SS.gone.trash.length) notes.push(['good', `捡走垃圾 ${SS.gone.trash.length} 处。`]);
+    if(sea.tl) notes.push(['bad', `垃圾 ${sea.tl} 处没捡：鱼群 −${(sea.tl*SEA.trashK*100).toFixed(1)}%，声誉 −${(sea.tl*0.4).toFixed(1)}。`]);
     if(SS.ev){ const E = SEA_EV[SS.ev];
-      if(SS.evFix) notes.push(['good', `${E.n}处理得及时，没有造成损失。`]);
-      else if(SS.evFound) notes.push(['bad', `你看到了${E.n}，但没有处理：${seaDmg(E)}。`]);
-      else notes.push(['bad', `${SEA_EV_TXT[SS.ev].miss}：${seaDmg(E)}。潜下去才看得到这些事。`]); }
-    if(sea.samples && V.research) notes.push(['good', `潜水调查的样本给研究站带来了 +${Math.round(sea.samples*SEA.sample)} 经费。`]); }
-  if(r.nutr > 0.3) notes.push(['bad', '排污口附近的海水正在变绿。']);
-  if(V.pol.zone !== 'none' && V.mpaSeasons >= 3 && eco.fish > 0.5) notes.push(['good', '保护区里的鱼开始外溢到周边海域。']);
+      if(SS.evFix) notes.push(['good', `${E.n}已处理，没有损失。`]);
+      else if(SS.evFound) notes.push(['bad', `${E.n}没处理：${seaDmg(E)}。`]);
+      else notes.push(['bad', `${SEA_EV_TXT[SS.ev].miss}：${seaDmg(E)}。`]); }
+    if(sea.samples && V.research) notes.push(['good', `调查样本：研究经费 +${Math.round(sea.samples*SEA.sample)}。`]); }
+  if(r.nutr > 0.3) notes.push(['bad', `排污口外藻类增多：入海污染 ${Math.round(r.nutr*100)}%。`]);
+  if(V.pol.zone !== 'none' && V.mpaSeasons === 4 && eco.fish > 0.5) notes.push(['good', '保护区满 4 季：鱼开始外溢，渔获回升。']);
   if(eco.coral < r.coralBefore - 0.005){ const worst = (r.coralWhy || []).filter(x => x[1] < 0).sort((a, b) => a[1] - b[1])[0];
     notes.push(['bad', `珊瑚少了 ${((r.coralBefore - eco.coral)*100).toFixed(1)}%${worst ? `，主要是「${worst[0]}」` : ''}。`]); }
-  if(eco.coral > r.coralBefore + 0.01) notes.push(['good', '新的珊瑚在长出来。']);
-  if(r.pop1 < r.pop0) notes.push(['bad', `${r.pop0 - r.pop1} 位村民搬走了。`]);
-  if(r.grant > 0.5) notes.push(['good', `海洋保护资助到账 ${Math.round(r.grant)}，其中 ${Math.round(r.wages)} 发给了修复礁区的村民。礁区越好，资助会越少。`]);
-  if(r.pop1 > r.pop0) notes.push(['good', `又有 ${r.pop1 - r.pop0} 位村民留了下来。`]);
-  if(eco.fish < 0.3) notes.push(['bad', '渔船回来时舱里空了一半。海里已经没剩多少鱼了。']);
-  if((eco.pelagic ?? 1) < 0.5 && (r.pelBefore ?? 1) > (eco.pelagic ?? 1)) notes.push(['bad', `远洋鱼群只剩 ${Math.round((eco.pelagic ?? 1)*100)}%。远洋渔船捞得太狠了，观鲸船也看不到什么了。`]);
+  if(eco.coral > r.coralBefore + 0.01) notes.push(['good', `珊瑚 +${((eco.coral - r.coralBefore)*100).toFixed(1)}%。`]);
+  if(r.pop1 < r.pop0) notes.push(['bad', `村民 −${r.pop0 - r.pop1}。`]);
+  if(r.grant > 0.5) notes.push(['good', `保护资助 ${Math.round(r.grant)}：村库 ${Math.round(r.grant - r.wages)}，修复工资 ${Math.round(r.wages)}。礁区越好，资助越少。`]);
+  if(r.pop1 > r.pop0 && r.pop1 >= r.cap) notes.push(['good', `村民 +${r.pop1 - r.pop0}，住满了（${r.cap} 人）。再建民居才会长人。`]);
+  if(eco.fish < 0.3) notes.push(['bad', `鱼群只剩 ${Math.round(eco.fish*100)}%。`]);
+  if((eco.pelagic ?? 1) < 0.5 && (r.pelBefore ?? 1) > (eco.pelagic ?? 1)) notes.push(['bad', `远洋鱼群只剩 ${Math.round((eco.pelagic ?? 1)*100)}%：远洋渔获和观鲸收入都在下降。`]);
   const over = isGameOver(), pct = x => Math.round(x*100) + '%';
   const icoN = { bad: 'warn', good: 'good', info: 'info' };
   $('village').classList.add('modal'); coins.forEach(c => c.t = Math.max(c.t, 2));
