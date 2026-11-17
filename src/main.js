@@ -51,10 +51,15 @@ renderer.domElement.addEventListener('pointerup', e => {
   if(hotMark && ['plan', 'report', 'over'].includes(state)){ if(focusOn) exitFocus(); diveInto(hotMark, 'free'); return; }
   if(['plan', 'report', 'over'].includes(state) && !$('village').classList.contains('modal')){ const pk = pickBuilding(e.clientX, e.clientY); if(pk) openFocus(pk); else if(focusOn) exitFocus(); }
 });
+// is the sea showing at this pixel? The water is a box (top and three glass sides), so a ray-box test answers it
+// without raycasting the dense water meshes (that cost ~0.4 ms a call, ~12 ms a frame for all the markers)
+const portalBox = new THREE.Box3(new THREE.Vector3(-49.85, -40, 0.9), new THREE.Vector3(49.85, -0.05, SEA_Z - 0.15)), portalHit = new THREE.Vector3();
 function portalVisibleAt(x, y){
   ndc.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1);
   raycaster.setFromCamera(ndc, dioCam);
-  return raycaster.intersectObjects(portalMeshes, false)[0] || null;
+  const p = raycaster.ray.intersectBox(portalBox, portalHit);
+  if(!p || p.z < 1.0) return null;                 // the shore side of the box is land, not glass
+  return { point: p.clone(), distance: p.distanceTo(raycaster.ray.origin) };
 }
 // ======================================================================= focus on one building: the camera flies to it, a card shows what it does and what an upgrade would add
 const PICK = [];   // { groups: () => [..], k, i, pos }
