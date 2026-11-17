@@ -189,6 +189,15 @@ function renderForecast(mutate, label){
     setDelta('dMoney', v.money - V.money); setDelta('dFood', v.food - V.food); setDelta('dPop', v.pop - V.pop); setDelta('dMorale', v.morale - V.morale); setDelta('dRep', (v.rep - V.rep)*100);
   }
   // the sea is only ever shown as arrows: its luck this season is unknown until someone dives and surveys
+  { const LUCK = ['风平浪静的一季', '水温偏高', '鱼苗多', '鱼苗少'];   // the season's luck stays hidden until surveyed
+    const why = (list0, unsure) => { const list = list0.filter(x => !(unsure && LUCK.includes(x[0]))); return list.length ? list.slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([l, x]) => `${l} ${x > 0 ? '▲' : '▼'}${Math.abs(x) >= 0.015 ? (x > 0 ? '▲' : '▼') : ''}`).join('　') + (unsure ? '　（还有没调查的季节变化）' : '') : '基本不变' + (unsure ? '（还有没调查的季节变化）' : ''); };
+    const S = V.sea, un = k => !!S && !S.seen[k];
+    $('mCoral').closest('.m').dataset.tip = `珊瑚：被拖网、游客、污水和热浪伤到会减少，受保护、水干净时会长回来。竖线是 55% 的目标。
+本季：${why(r.coralWhy || [], un('coral'))}`;
+    $('mFish').closest('.m').dataset.tip = `鱼群：繁殖快于捕捞就会增加；珊瑚越好，能养的鱼越多。竖线是 55% 的目标。
+本季：${why(r.fishWhy || [], un('fish'))}`;
+    $('mWater').closest('.m').dataset.tip = `水质：污水和游客垃圾让水变浑；水越浑，珊瑚越难恢复，游客越少。
+本季污染指数 ${Math.round(r.nutr*100)}（超过 22 可能赤潮）。直排时污水全部入海，简易处理剩 40%，全面处理剩 10%。`; }
   const pv = !!mutate; setTrend('tCoral', eco.coral, lo.coral, hi.coral, pv); setTrend('tWater', eco.clar, e.clar, e.clar, pv); setTrend('tFish', eco.fish, lo.fish, hi.fish, pv); setTrend('tPel', eco.pelagic ?? 1, lo.pelagic ?? 1, hi.pelagic ?? 1, pv);
 }
 // what the village knows about the sea this season: the jobs waiting down there and the trouble it was told about

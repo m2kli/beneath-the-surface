@@ -211,6 +211,7 @@ function simulateSeason(e0, v0, haul){
   const K = 0.3 + 0.7*e.coral;
   const growth = 0.32*sf.spawn*e.fish*(1 - e.fish/K)*spawnHit + (P.zone !== 'none' ? 0.012 : 0);
   const fishBefore = e.fish, coralBefore = e.coral, clarBefore = e.clar, pelBefore = e.pelagic;
+  r.fishWhy = [['繁殖', growth], ['捕捞和误捕', -reefCatch*0.0059*(1 + bycatch)], ['幽灵网', -0.05*e.ghost], ['偷捕', -(M.poach || 0)]].filter(x => Math.abs(x[1]) >= 0.002);
   e.fish = clamp(e.fish + growth - reefCatch*0.0059*(1 + bycatch) - 0.05*e.ghost - (M.poach || 0), 0.02, 1);
   e.pelagic = clamp(e.pelagic + OFF.regrow*e.pelagic*(1 - e.pelagic)*(0.4 + 0.6*sf.spawn) - offCatch*OFF.deplete, 0.02, 1);
   e.ghost = e.ghost*0.85 + lost;
@@ -230,7 +231,10 @@ function simulateSeason(e0, v0, haul){
     v.rep = clamp(v.rep - 0.004*sea.tl, 0, 1);
     if(Math.abs(S.t.coral) >= 0.002) r.coralWhy.push([S.t.coral > 0 ? '风平浪静的一季' : '水温偏高', S.t.coral]);
     if(sea.cl) r.coralWhy.push(['长棘海星', -SEA.cotsK*sea.cl]);
-    if(sea.E && sea.E.coral) r.coralWhy.push([sea.E.n, -sea.E.coral]); }
+    if(sea.E && sea.E.coral) r.coralWhy.push([sea.E.n, -sea.E.coral]);
+    if(Math.abs(S.t.fish) >= 0.002) r.fishWhy.push([S.t.fish > 0 ? '鱼苗多' : '鱼苗少', S.t.fish]);
+    if(sea.tl) r.fishWhy.push(['垃圾', -SEA.trashK*sea.tl]);
+    if(sea.E && sea.E.fish) r.fishWhy.push([sea.E.n, -sea.E.fish]); }
   r.sea = sea;
   Object.assign(r, { labor, need, staff, catchT, reefCatch, offCatch, sold, spoiled, fishPrice, fishInc, haul: haul || 0, tourInc, visitors, whaleVis, allVis, privCost, earn, tax, fee, gross, perCap, resInc,
     pubTotal, moneyDelta: income - pubTotal, eat, reserve, stock0: v0.food, grant, wages, degraded, protect, restoreNeed, dMor, pop0, pop1: v.pop, cap, foodNeed, shortage, hungry, food: v.food, attract,
