@@ -5,16 +5,16 @@ const REC = { top: 0.62, floor: 0.3, core: 0.7, nurs: 0.35, dumpK: 0.4, jobs: 0.
 // the open sea beyond the reef wall, fished by the harbour's offshore boats and watched from its whale boats
 const OFF = { catchK: 2.4, deplete: 0.011, regrow: 0.15, whaleV: 9, whaleP: 6, okLine: 0.4, resInc: 3 };
 const BUILD = [
-  { k: 'boat', name: '渔船', cost: 35, max: 10, desc: '多一条船出海。需要 2 名船员。' },
-  { k: 'trawler', name: '拖网船', cost: 90, max: 3, desc: '大规模捕捞时下网，渔获很多。需要 3 名船员。' },
-  { k: 'house', name: '民居', cost: 35, max: 20, desc: '再住 4 个村民。民心好时村子才会长人。' },
+  { k: 'boat', name: '渔船', cost: 35, max: 10, desc: '多一条船出海。需要 2 名船员，每季成本 1–3（看捕捞政策）。' },
+  { k: 'trawler', name: '拖网船', cost: 90, max: 3, desc: '只在大规模捕捞时下网，渔获约等于 3 条渔船，但会刮伤礁区。需要 3 名船员。' },
+  { k: 'house', name: '民居', cost: 35, max: 20, desc: '住房上限 +4（升级后 6、8）。民心高于 55 时每季长 2 人。' },
   { k: 'shop', name: '潜水店', cost: 60, max: 5, desc: '接待潜水客。需要 2–3 名向导。' },
   { k: 'resort', name: '度假村', cost: 160, max: 2, desc: '大批游客，需要 5–8 名员工，污水量很大。' },
-  { k: 'cold', name: '冷库', cost: 50, max: 1, desc: '鱼货能多存一季、少坏一些，卖价也更高。' },
-  { k: 'plant', name: '污水处理厂', cost: 70, max: 1, desc: '处理污水的费用减半。' },
-  { k: 'recycle', name: '渔网回收站', cost: 40, max: 1, desc: '旧渔网统一回收，不再遗落海中。' },
-  { k: 'nursery', name: '珊瑚苗圃', cost: REC.nurseryCost, max: 1, desc: '培育珊瑚移植回礁区，珊瑚恢复快得多，保护资助也更多。需要 2 人照看。' },
-  { k: 'school', name: '渔民学校', cost: 60, max: 1, desc: '教村民做配额管理和导游，配额捕捞、限流观光都更有效。' },
+  { k: 'cold', name: '冷库', cost: 50, max: 1, desc: '留一整季口粮过季，存鱼损耗 35% → 5%，鱼价 +10%。' },
+  { k: 'plant', name: '污水处理厂', cost: 70, max: 1, desc: '污水处理费 −50%（升级后 −60%、−70%）。' },
+  { k: 'recycle', name: '渔网回收站', cost: 40, max: 1, desc: '遗落渔网 −85%（升级后 −94%）。' },
+  { k: 'nursery', name: '珊瑚苗圃', cost: REC.nurseryCost, max: 1, desc: '珊瑚恢复速度 +90%，保护资助增加。需要 2 人。' },
+  { k: 'school', name: '渔民学校', cost: 60, max: 1, desc: '配额捕捞渔获 +12%，限流观光票价 +15%（升级后更多）。' },
   { k: 'harbor', name: '渔港', cost: 120, max: 1, desc: '深水码头。能停靠远洋渔船和观鲸船，升级后停得更多。需要 2 人。' },
   { k: 'offshore', name: '远洋渔船', cost: 80, max: 6, need: 'harbor', desc: '去礁墙外的远洋捕鱼，不伤礁区，但远洋鱼群也会被捞空。需要 3 名船员。' },
   { k: 'whale', name: '观鲸船', cost: 70, max: 3, need: 'harbor', desc: '带游客出海看鲸和远洋鱼群。游客不碰礁区，远洋越健康越赚钱。需要 2 人。' },
@@ -47,10 +47,10 @@ function maxOf(v, k){ const b = BUILD.find(x => x.k === k), hl = (v.harbor || 0)
   if(k === 'offshore') return [0, 2, 4, 6][hl]; if(k === 'whale') return [0, 1, 2, 3][hl]; return b.max; }
 const seasonName = s => `第 ${Math.floor(s/4) + 1} 年 · ${['春', '夏', '秋', '冬'][s % 4]}`;
 const SEASON_FX = [
-  { spawn: 1.6, tour: 0.9, catchK: 1.0, price: 1.0, note: '春季是鱼类产卵季：这时候捕鱼，伤的是明年的鱼。' },
-  { spawn: 1.0, tour: 1.5, catchK: 1.0, price: 1.0, note: '夏季是旅游旺季。海水变暖，要小心珊瑚白化。' },
-  { spawn: 0.8, tour: 0.9, catchK: 1.25, price: 0.9, note: '秋季鱼最多，渔获最好，鱼价也会低一些。' },
-  { spawn: 0.5, tour: 0.45, catchK: 0.8, price: 1.2, note: '冬季风浪大、游客少，鱼货卖得贵。' },
+  { spawn: 1.6, tour: 0.9, catchK: 1.0, price: 1.0, note: '产卵季：鱼群繁殖 ×1.6。这一季捕鱼，繁殖最多 −40%。' },
+  { spawn: 1.0, tour: 1.5, catchK: 1.0, price: 1.0, note: '旅游旺季：游客 ×1.5。可能遇到热浪白化。' },
+  { spawn: 0.8, tour: 0.9, catchK: 1.25, price: 0.9, note: '渔获 ×1.25，鱼价 ×0.9。' },
+  { spawn: 0.5, tour: 0.45, catchK: 0.8, price: 1.2, note: '游客 ×0.45，渔获 ×0.8，鱼价 ×1.2。' },
 ];
 const TAX = { low: 0.12, mid: 0.22, high: 0.32 };
 // how developed the village is: buildings (and how far they have been upgraded) and people, not money

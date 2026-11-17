@@ -95,15 +95,15 @@ function layoutSea(S){
 }
 const seaLeft = S => ({ cots: COTS.filter((c, i) => i < S.cots && !S.gone.cots.includes(i)).length, trash: TRASH.filter((g, i) => i < S.trash && !S.gone.trash.includes(i)).length });
 function seaSays(k, S){
-  const x = S.t[k], up = x > 0.007, dn = x < -0.007, res = V.research ? ' 样本会交给研究站。' : '';
-  if(k === 'coral'){ let m = up ? '水温正常，礁上冒出了不少新珊瑚。这一季珊瑚会自己多长一点。' : dn ? '水温偏高，有几处珊瑚开始发白。这一季珊瑚会多掉一点。' : '水温正常，珊瑚状态平稳。';
-    if(S.cots) m += ` 礁上有 ${S.cots} 只长棘海星，排污带来的营养越多，它们越多。`;
-    if(S.ev === 'blast' || S.ev === 'disease'){ S.evHint = true; m += ' 另一片礁上好像有异样，已经标出来了。'; }
+  const x = S.t[k], up = x > 0.007, dn = x < -0.007, res = V.research ? ` 研究站经费 +${SEA.sample}。` : '';
+  if(k === 'coral'){ let m = up ? '水温适宜，新珊瑚多：本季珊瑚额外上升。' : dn ? '水温偏高，有珊瑚发白：本季珊瑚额外下降。' : '水温正常。';
+    if(S.cots) m += ` 长棘海星 ${S.cots} 只（污水越多越多）。`;
+    if(S.ev === 'blast' || S.ev === 'disease'){ S.evHint = true; m += ' 另一片礁上有异样，已标出。'; }
     return m + res; }
-  if(k === 'fish'){ let m = up ? '鱼苗很多，今年是个好年份。' : dn ? '鱼苗比往年少，这一季鱼群会长得慢一些。' : '鱼苗和往年差不多。';
-    if(S.ev === 'lion'){ S.evHint = true; m += ' 礁上有一种没见过的鱼在吃小鱼，已经标出来了。'; }
+  if(k === 'fish'){ let m = up ? '鱼苗多：本季鱼群额外上升。' : dn ? '鱼苗少：本季鱼群额外下降。' : '鱼苗和往年差不多。';
+    if(S.ev === 'lion'){ S.evHint = true; m += ' 礁上有外来的鱼在吃小鱼，已标出。'; }
     return m + res; }
-  return (up ? '金枪鱼群洄游过来了，远洋鱼群这一季会多一些。' : dn ? '洄游的鱼群来得比往年晚，远洋鱼群这一季会少一些。' : '远洋鱼群和往年差不多。') + res;
+  return (up ? '金枪鱼洄游早：本季远洋鱼群额外上升。' : dn ? '洄游晚：本季远洋鱼群额外下降。' : '远洋鱼群和往年差不多。') + res;
 }
 const SEA_FIND = {
   blast: ['有人在炸鱼', '礁石被炸开了一片，碎珊瑚和翻着白肚的鱼散了一地。岸上没人知道。浮上去以后可以决定怎么办。'],
@@ -125,14 +125,14 @@ function updateSea(dt, ctrl){
     m.orb.material.uniforms.uSize.value = 3.4 + 3.5*m.prog/SURVEY_T + (inside ? Math.sin(time*9)*0.3 : 0);
     if(inside) sea3.surveyNow = k;
     if(m.prog >= SURVEY_T){ m.prog = 0; S.seen[k] = true; pulseAt(m.pos); emit(m.pos, 60, 4, 1, 1); chime(SEA_KEYS.filter(q => S.seen[q]).length*2 + 1);
-      toast(`${m.name} · 完成`, seaSays(k, S) + ' 岸上的预测已经更新。', 8500); } }
+      toast(`${m.name} · 完成`, seaSays(k, S) + ' 预测已更新。', 8000); } }
   COTS.forEach((c, i) => { c.visible = c.userData.orb.visible = i < S.cots && !S.gone.cots.includes(i); if(!c.visible) return;
     c.userData.orb.position.copy(c.position); c.userData.orb.position.y += 1.6 + Math.sin(time*2 + i)*0.15;
     if(live && c.position.distanceTo(P) < 4.4){ S.gone.cots.push(i); c.visible = c.userData.orb.visible = false; emit(c.position, 90, 5, 1.2, 1); chime(S.gone.cots.length + 2);
-      const n = seaLeft(S).cots; toast('长棘海星 · 已清除', `一只一晚上能啃掉一大片珊瑚。${n ? `还剩 ${n} 只。` : '这片礁上的清完了。'}`); } });
+      const n = seaLeft(S).cots; toast('长棘海星 · 已清除', `每只每季让珊瑚 −${(SEA.cotsK*100).toFixed(2).replace(/0$/, '')}%。${n ? `还剩 ${n} 只。` : '清完了。'}`); } });
   TRASH.forEach((g, i) => { g.visible = i < S.trash && !S.gone.trash.includes(i); if(!g.visible) return;
     if(live && g.position.distanceTo(P) < 4.8){ S.gone.trash.push(i); g.visible = false; emit(g.position, 70, 4, 1.5, 1); chime(S.gone.trash.length + 1);
-      const n = seaLeft(S).trash; toast('垃圾 · 已捡走', `顺着排污口冲出来的。海龟会把塑料袋当成水母吃下去。${n ? `还剩 ${n} 处。` : ''}`); } });
+      const n = seaLeft(S).trash; toast('垃圾 · 已捡走', `每处每季让鱼群 −${(SEA.trashK*100).toFixed(1)}%、声誉 −0.4。${n ? `还剩 ${n} 处。` : '捡完了。'}`); } });
   if(S.ev){
     if(live && !S.evFound && sea3.evPos.distanceTo(P) < 20){ S.evFound = true; pulseAt(sea3.evPos); chime(5); toast(SEA_FIND[S.ev][0], SEA_FIND[S.ev][1], 9000); }
     if(S.ev === 'blast'){ blastFish.forEach(f => { const a = f.a + time*0.04, y = sea3.evPos.y + f.h + Math.sin(time*0.5 + f.ph)*0.25;
@@ -169,7 +169,7 @@ function startSeaDive(){
   ensureSea(); const S = V.sea; layoutSea(S); S.dived = true;
   nightT = night = dioNight;   // the same time of day as the shore you dived from
   sea3.start = { seen: SEA_KEYS.filter(k => S.seen[k]).length, cots: S.gone.cots.length, trash: S.gone.trash.length, ev: S.evFound };
-  if(!V.seaTut){ V.seaTut = true; cue(3, () => toast('水下能做的事', '游到发光的调查点停一会儿，岸上的预测就会变准。清掉长棘海星和垃圾，留意岸上看不到的问题。', 9500)); }
+  if(!V.seaTut){ V.seaTut = true; cue(3, () => toast('水下能做的事', '在发光的调查点停 2 秒：海洋预测去掉 ?。清掉长棘海星和垃圾。去看看标着 ? 的地方。', 9000)); }
 }
 // back on land: what this dive did, and a decision if you found trouble
 const SEA_EV_TXT = {

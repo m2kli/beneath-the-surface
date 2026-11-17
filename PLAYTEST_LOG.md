@@ -28,3 +28,33 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - The camera never went above −0.8 relative to the surface.
 - No fish went below the sand (maximum penetration 0).
 - No errors.
+
+## Round 3: full playthrough bot
+
+- `tools/playbot.mjs` plays a whole game through the real buttons (title → 16 seasons → ending) in the page, advancing time with `__g.step` so it works in a hidden tab.
+- It flags stuck waits, a dim overlay with no card on it, two cards open at once, panels off screen, and errors.
+- First run (balanced plan, diving half the seasons): 16 seasons, 7 dives, 35 underwater tasks done, ending "两边都撑过来了". **No issues found.**
+- It did show that report notes repeat every season (spillover, new villagers, the short-staffed advice). Fixed in round 4.
+
+## Round 4: the user's feedback list (items 1–7)
+
+1. **Policy income (explained, numbers unchanged).**
+   - Fishing income does rise with catch: industrial +73 / quota +61 / hand-line +43 / ban +31 treasury per season in a mid-game village. It looks flat because the treasury only taxes fish that is *sold*, and villagers eat first.
+   - Tourism: open and limited earn the same on a healthy reef (limited is a premium price). Open wins only once the reef is damaged.
+   - I tried giving open a clear money edge. Every version cut the careful bot's good endings from 80% to 50–67%, so the numbers stay. The descriptions now say exactly what each option does.
+2. **Markers through the UI.** `#marks` sat above the panels. The village layer and HUD are now on top, and markers (and building hover) hide wherever a panel covers them.
+3. **Option order.** Left = free or profitable but risky; right = costs something, safe. Changed: tax row (now high → low), and storm, heatwave, poachers, petition and the underwater finds (now "do nothing" left, "pay to fix" right).
+4. **Text.**
+   - Policy descriptions now state thresholds, rates and live costs.
+   - Warnings and report notes are cut down to the fact plus its number.
+   - New forecast line: stock + catch → eaten, sold × price, kept, spoiled.
+   - The stored-fish tooltip gives consumption, carry-over, price, spoilage and the import price.
+5. **One change-arrow language.**
+   - Village books (money, fish, people, morale, reputation): exact numbers.
+   - The sea: arrows only (1–3 by size, green up, red down). A `?` means the season hasn't been surveyed.
+   - The report shows measured arrows plus the exact change.
+   - The hatched ghost bars are gone.
+6. **Underwater jobs from the shore.** Markers on the water for surveys, starfish, rubbish, ghost nets, and `?` for unexplained activity. Click one to dive straight to it.
+7. **Night underwater.** A dive keeps the shore's time of day. At night: fluorescent coral, glowing jellyfish, bioluminescent plankton, a shimmering wake.
+
+**Needs a human eye:** whether the arrow sizes (thresholds 0.4% / 1.5% / 4% per season) feel right, and whether the night is dark enough.

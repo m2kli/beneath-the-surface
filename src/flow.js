@@ -35,7 +35,7 @@ function start(loaded){
   initAudio();
   enterVillage(() => setState('plan'));
   if(loaded) cue(0.8, () => toast('读取存档', `${seasonName(V.season)} · ${TIERS[devTier(V)].n}。接着上次的地方继续。`, 5000));
-  else cue(1.0, () => toast('岸上', '这个渔村靠门前这片珊瑚礁过活。现在由你来经营它。', 5000));
+  else cue(1.0, () => toast('岸上', '这个渔村靠门前的珊瑚礁过活。由你来经营它。', 5000));
   cue(2.2, () => { if(!coachDone && !params.get('nocoach') && (!loaded || V.season === 0)) showCoach(0); });
 }
 // ---- switching between the two halves
@@ -468,7 +468,7 @@ function finishTrawl(){
 function cutNet(d){
   d.alive = false; d.die = 1; eco.ghost = Math.max(0, eco.ghost - 0.25);
   pulseAt(d.pos); emit(d.pos, 160, 9, 1, 1); chime(debris.filter(x => !x.alive).length + 1);
-  toast('幽灵网 · 已割断', '遗落的渔网会持续捕鱼好几年。这一张停下了。');
+  toast('幽灵网 · 已割断', '每张幽灵网每季让鱼群 −1.25%。');
 }
 function summonWhale(){ whale.visible = true; whaleT = 0; whaleC.copy(player.pos); whaleTh = player.yaw + 0.5; }
 function surfaceUp(){
