@@ -4,6 +4,8 @@
 //   const bot = await import('/tools/playbot.mjs?' + Date.now()); const rep = await bot.playGame({ dive: 0.4 });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const $ = id => document.getElementById(id);
+// where an element comes to rest: a hidden tab freezes CSS transitions mid-way, which reads as overlaps that aren't there
+const rest = el => { const t = el.style.transition; el.style.transition = 'none'; const r = el.getBoundingClientRect(); el.style.transition = t; return r; };
 const on = id => $(id) && $(id).classList.contains('on');
 const vis = el => { if(!el) return false; const r = el.getBoundingClientRect(), cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.05; };
 
@@ -26,7 +28,7 @@ export async function playGame(o = {}){
     if(cards.length > 1) issue(`${where}：同时打开了 ${cards.join('+')}`);
     if($('village').classList.contains('modal') && !cards.length && g.mode === 'village' && !['event'].includes(g.state)) issue(`${where}：遮罩开着但没有任何卡片（state=${g.state}）`);
     if(g.state === 'plan' && g.mode === 'village' && !cards.length && $('vRun').disabled) issue(`${where}：规划阶段“开始本季”是灰的`);
-    for(const id of ['vTop', 'vSide', 'vClock', 'hud', 'vBottom', ...cards, 'bInfo']){ const el = $(id); if(!vis(el)) continue; const r = el.getBoundingClientRect();
+    for(const id of ['vTop', 'vSide', 'vClock', 'hud', 'vBottom', ...cards, 'bInfo']){ const el = $(id); if(!vis(el)) continue; const r = rest(el);
       if(r.left < -2 || r.top < -2 || r.right > innerWidth + 2 || r.bottom > innerHeight + 2) issue(`${where}：#${id} 超出屏幕 (${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)} / ${innerWidth}x${innerHeight})`); }
     const e = (window.__errs || []).slice(errs0); if(e.length) issue(`${where}：报错 ${e[e.length - 1]}`);
   };
