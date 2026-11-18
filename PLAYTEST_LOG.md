@@ -82,3 +82,14 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - **Balanced-plan bot:** 16 seasons, ending "村子富了。只富了一次。" (coral finished at 53%, just under the line), no UI issues.
 - **Balance suite:** identical to the baseline.
 - **Note for testing:** with the app window minimized, CSS transitions freeze. The HUD then reads as sitting on top of the village card, which looks like an overlap but isn't one.
+
+## Round 7: smaller screens (1024×640)
+
+- **Bots at 1024×640:** green plan (dive 30%) ended "两边都撑过来了"; balanced (dive 60%) ended "两边都撑过来了"; greedy ended early with "村子空了" as expected. No real UI issues.
+- **Found and fixed (short screens):** the forecast took half the right panel, so the policy list showed about one card at a time. Below 760 px tall, its detail rows (catch, tourists, fish stock line) fold away and open when you hover the forecast. The policy list goes from 158 to 288 px. Taller screens are unchanged.
+- **Found and fixed (narrower than 1400 px):** the first-dive tip ran under the animal card and the controls card, with "浮上水面" on top of its text. Dive tips now sit above both cards.
+- **Found and fixed:** shore tips started behind the 海洋 panel. They are now centred in the gap between the left panels and the right panel, at every width.
+- **Report note:** "村民 −3。" now gives the cause ("吃不饱" or "民心低于 30"), matching the forecast's warning.
+- **Playbot:** it now measures where panels come to rest. A hidden tab freezes CSS transitions mid-way, which had reported the report card as off screen when it wasn't.
+- **Dev server:** the stylesheet is cache-busted on localhost like the scripts.
+- **Balance suite:** identical to the baseline.

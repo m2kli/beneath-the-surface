@@ -508,3 +508,6 @@ body.vmode .coin{font-family:Inter,"Noto Sans SC",sans-serif;font-weight:700;fon
    between them for a centred tip, so tips sit above both cards */
 @media (max-width:1400px){ body:not(.vmode) #toast{bottom:172px;font-size:21px;max-width:min(600px,calc(100vw - 80px))} }
 @media (max-width:1400px) and (max-height:600px){ body:not(.vmode) #toast{bottom:150px;font-size:18px} }
+/* on the shore, tips sit in the gap between the left panels (~290px) and the right panel (~340px) */
+@media (min-width:700px){ body.vmode #toast{left:calc((100% - 50px)/2);max-width:min(560px,calc(100vw - 670px))} }
+@media (min-width:700px) and (max-width:1300px){ body.vmode #toast{font-size:20px} }

@@ -314,7 +314,7 @@ function showReport(r){
   if(eco.coral < r.coralBefore - 0.005){ const worst = (r.coralWhy || []).filter(x => x[1] < 0).sort((a, b) => a[1] - b[1])[0];
     notes.push(['bad', `珊瑚少了 ${((r.coralBefore - eco.coral)*100).toFixed(1)}%${worst ? `，主要是「${worst[0]}」` : ''}。`]); }
   if(eco.coral > r.coralBefore + 0.01) notes.push(['good', `珊瑚 +${((eco.coral - r.coralBefore)*100).toFixed(1)}%。`]);
-  if(r.pop1 < r.pop0) notes.push(['bad', `村民 −${r.pop0 - r.pop1}。`]);
+  if(r.pop1 < r.pop0) notes.push(['bad', `村民 −${r.pop0 - r.pop1}：${r.hungry ? '吃不饱' : '民心低于 30'}，有人搬走了。`]);
   if(r.grant > 0.5) notes.push(['good', `保护资助 ${Math.round(r.grant)}：村库 ${Math.round(r.grant - r.wages)}，修复工资 ${Math.round(r.wages)}。礁区越好，资助越少。`]);
   if(r.pop1 > r.pop0 && r.pop1 >= r.cap) notes.push(['good', `村民 +${r.pop1 - r.pop0}，住满了（${r.cap} 人）。再建民居才会长人。`]);
   if(eco.fish < 0.3) notes.push(['bad', `鱼群只剩 ${Math.round(eco.fish*100)}%。`]);
