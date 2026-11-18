@@ -15,6 +15,7 @@ const FILES = ['core.js', 'seafloor.js', 'fish.js', 'creatures.js', 'avatars.js'
   'state.js', 'model.js', 'season.js', 'dive.js', 'flow.js', 'saves.js', 'main.js'];
 const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const bust = local || new URLSearchParams(location.search).has('nocache') ? '?t=' + Date.now() : '';
+if(bust){ const css = document.querySelector('link[href="src/style.css"]'); if(css) css.href = 'src/style.css' + bust; } // dev: pick up style edits without a hard reload
 const texts = await Promise.all(FILES.map(f => fetch('src/' + f + bust).then(r => { if(!r.ok) throw new Error('could not load src/' + f); return r.text(); })));
 // errors report a line in "game.js"; __srcMap turns it back into file:line
 const map = []; let line = 1;
