@@ -496,3 +496,15 @@ body:not(.vmode) #bInfo,body:not(.vmode) #bTag{display:none}
 #avatarCard .an{display:flex;align-items:center;gap:7px}
 #surfaceBtn{box-shadow:0 3px 0 rgba(0,0,0,.25)}
 body.vmode .coin{font-family:Inter,"Noto Sans SC",sans-serif;font-weight:700;font-size:16px}
+/* short screens: the forecast's detail rows fold away so the policy list keeps room; hovering the forecast opens them */
+@media (max-height:760px){
+  #vPredict .sm,#vPredict .fl{max-height:0;overflow:hidden;opacity:0;margin:0;padding-top:0;padding-bottom:0;border-width:0;transition:max-height .25s,opacity .2s}
+  #vPredict:hover .sm,#vPredict:hover .fl{max-height:120px;opacity:1}
+  #vPredict:hover .fl{margin-top:6px;padding-top:5px;padding-bottom:5px;border-width:1px}
+  #vPredict .pt::after{content:'悬停看明细';font-weight:400;letter-spacing:0;opacity:.6;margin-left:6px}
+  #vPredict.preview .pt::after,#vPredict:hover .pt::after{content:''}
+}
+/* diving on narrower screens: the animal card (bottom left) and the controls card (bottom right) leave too little room
+   between them for a centred tip, so tips sit above both cards */
+@media (max-width:1400px){ body:not(.vmode) #toast{bottom:172px;font-size:21px;max-width:min(600px,calc(100vw - 80px))} }
+@media (max-width:1400px) and (max-height:600px){ body:not(.vmode) #toast{bottom:150px;font-size:18px} }
