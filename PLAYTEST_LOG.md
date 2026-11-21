@@ -120,3 +120,19 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - **Fishing boats:** a white hull stripe, a life ring on the cabin, fish crates and a pile of net on deck, a buoy on the bow.
 - **Checked:** close-ups at tiers 0, 1 and 3, the mid and default views, and night and dusk. No errors. A full tier-3 town runs at ~14 ms per frame.
 - **Not changed:** stilt huts and tiled cottages (already the most detailed), roads, the harbour quay.
+
+## Round 10: huts, cottages, dock, roads, boats and fish
+
+- **Stilt huts:** walls of individual boards in six tones with dark gaps and rails, a shaggy two-tone thatch fringe over the eaves, cross-braced stilts, and a dugout canoe and two fish traps under the floor.
+- **Tiled cottages:** stone quoins on the front corners, bargeboards along the gables, a banded chimney with two pots, a bench by the door and plant pots on the step.
+- **Wooden dock:** planks of uneven tone and length on two stringers, post caps, mooring cleats, coiled rope and a ladder down to the water.
+- **Concrete pier:** expansion joints, tyre fenders along both sides, life-ring stands.
+- **Asphalt roads:** white edge lines, paving joints in the pavements.
+- **Fishing boats and trawlers:** framed cabin windows on the front and sides, a door at the back, an overhanging roof with a dark rim, a searchlight and antenna, a radar bar on trawlers, and an orange net heap with floats instead of the green blob.
+- **Tour boats:** deck rails, a bench, a life ring, a blue stripe on the canopy.
+- **Offshore longliners:** bridge wings and a radar, portholes, orange buoys racked on the rail, a red waterline, a liferaft canister.
+- **Fish:**
+  - every species shares a new, smoother mesh with a forked tail fanned out to swept lobes, a dorsal fin that peaks behind the head, a shaped anal fin, and pectoral and pelvic fins on both sides;
+  - fins are lighter than the body, with fine rays, and there's a gill line behind the eye;
+  - silver fish (barracuda, tuna, sardines) reflect less, so they no longer blow out to white.
+- **Checked:** close-ups of each, underwater shots of five species. No errors; tier-3 town ~12 ms, dive ~14 ms per frame.

@@ -75,10 +75,15 @@ function hutKit(i){
   const thatch = ['#cdb06e', '#c2a061', '#d4b97c'][i % 3];
   for(const sx of [-1, 1]) for(const z of [-(D/2 - 0.15), D/2 - 0.15, D/2 + 1.05]) k.cyl(0.1, 0.13, lift + 0.05, 5, dark, sx*(W/2 - 0.12), lift/2, z);
   k.box(W + 0.3, 0.14, D + 1.3, plank, 0, lift, 0.55);
+  for(const sx of [-1, 1]){ const L = Math.hypot(lift, D - 0.3); k.box(0.05, L, 0.05, dark, sx*(W/2 - 0.12), lift/2, 0, 0, Math.atan2(D - 0.3, lift)); }
+  k.box(W - 0.2, 0.05, 0.05, dark, 0, lift*0.45, -(D/2 - 0.15), 0, 0, Math.atan2(lift*0.9, W - 0.2)*0.5);
   for(let j=1;j<6;j++) k.box(0.03, 0.15, D + 1.3, shade(plank, 0.7), -W/2 - 0.15 + j*(W + 0.3)/6, lift + 0.005, 0.55);
-  k.box(W, H, D, wall, 0, fl + H/2, 0);
-  for(let j=0;j<=8;j++) k.box(0.06, H, 0.05, shade(wall, 0.72), -W/2 + j*W/8, fl + H/2, D/2 + 0.02);
-  for(const sx of [-1, 1]) for(let j=0;j<=5;j++) k.box(0.05, H, 0.06, shade(wall, 0.72), sx*(W/2 + 0.02), fl + H/2, -D/2 + j*D/5);
+  k.box(W - 0.04, H, D - 0.04, shade(wall, 0.6), 0, fl + H/2, 0);
+  // walls of vertical boards, each a slightly different tone and length, with a dark gap between them
+  { const tones = [0.88, 1.0, 0.93, 1.07, 0.96, 0.84];
+    for(let j=0;j<10;j++){ const bw = W/10, x = -W/2 + bw*(j + 0.5), hh = H - R()*0.08; k.box(bw - 0.03, hh, 0.07, shade(wall, tones[(j + i) % 6]), x, fl + hh/2, D/2); k.box(bw - 0.03, hh, 0.07, shade(wall, tones[(j + 3) % 6]), x, fl + hh/2, -D/2); }
+    for(const sx of [-1, 1]) for(let j=0;j<8;j++){ const bw = D/8, z = -D/2 + bw*(j + 0.5), hh = H - R()*0.08; k.box(0.07, hh, bw - 0.03, shade(wall, tones[(j + i + (sx > 0 ? 1 : 4)) % 6]), sx*W/2, fl + hh/2, z); }
+    for(const y of [fl + 0.35, fl + H - 0.3]) k.box(W + 0.1, 0.1, 0.06, shade(wall, 0.62), 0, y, D/2 + 0.05); }
   k.box(W + 0.08, 0.12, D + 0.08, dark, 0, fl + 0.06, 0);
   k.box(0.82, 1.45, 0.06, '#3b2a1c', 0.75, fl + 0.73, D/2 + 0.05);
   k.win(0.72, 0.55, 0.06, -0.75, fl + 1.3, D/2 + 0.05);
@@ -88,6 +93,13 @@ function hutKit(i){
   k.box(1.0, 0.3, 0.45, plank, 0.75, 0.62, D/2 + 1.42); k.box(1.0, 0.3, 0.45, plank, 0.75, 0.3, D/2 + 1.85); k.box(1.0, 0.3, 0.45, plank, 0.75, 0.0, D/2 + 2.25);
   gable(k, W, D, fl + H, 0.72, 0.6, thatch, wall, { t: 0.3, side: 0.42, ridge: shade(thatch, 0.7), ridgeH: 0.3, ridgeW: 0.45,
     rows: { step: 0.3, h: 0.12, w: 0.24, col: shade(thatch, 0.86), col2: shade(thatch, 1.06) } });
+  // a shaggy fringe where the thatch ends: tufts hanging over the eaves, in two tones
+  { const over = 0.6, half = D/2 + over, rise = (D/2)*Math.tan(0.72), yE = fl + H + rise - (half)*Math.tan(0.72) + 0.05;
+    for(const sz of [-1, 1]) for(let j=0;j<16;j++){ const x = -W/2 - 0.35 + j*(W + 0.7)/15, l = 0.28 + R()*0.18;
+      k.box(0.24, l, 0.08, j % 2 ? shade(thatch, 0.78) : shade(thatch, 0.92), x, yE - l/2 + 0.08, sz*(half + 0.02), 0, sz*0.25); } }
+  // under the hut: a dugout canoe and two cone fish traps
+  k.geo(new THREE.SphereGeometry(1, 10, 6).scale(0.28, 0.16, 1.4), '#7a5534', 0.3, 0.14, -0.3, 0.15);
+  for(const q of [0, 1]) k.geo(new THREE.ConeGeometry(0.22, 0.6, 7, 1, true).rotateZ(Math.PI/2), '#b89a62', -W/2 + 0.5 + q*0.45, 0.22, -D/2 + 0.4);
   // fish drying on a line, a barrel, a pile of nets, a lantern on the porch
   const fx = W/2 + 0.95;
   for(const dz of [-0.85, 0.85]) k.cyl(0.04, 0.05, 1.8, 4, dark, fx, 0.9, D/2 + dz);
@@ -109,10 +121,17 @@ function cottageKit(i, two = i % 3 === 1){
   k.box(W, H, D, wall, 0, base + H/2, 0);
   const tr = [];
   for(const sx of [-1, 1]) for(const sz of [-1, 1]) k.box(0.2, H, 0.2, trim, sx*W/2, base + H/2, sz*D/2);
+  // stone quoins on the front corners, alternating long and short
+  for(const sx of [-1, 1]) for(let q=0; q*0.42 < H - 0.3; q++){ const l = q % 2 ? 0.34 : 0.52; k.box(0.05, 0.3, l, shade(stone, 1.08 - (q % 3)*0.05), sx*(W/2 + 0.11), base + 0.2 + q*0.42, D/2 - l/2 + 0.1); k.box(l, 0.3, 0.05, shade(stone, 1.04 - (q % 3)*0.05), sx*(W/2 - l/2 + 0.1), base + 0.2 + q*0.42, D/2 + 0.11); }
   if(two) k.box(W + 0.12, 0.2, D + 0.12, trim, 0, base + H*0.5, 0);
   k.box(W + 0.14, 0.22, D + 0.14, trim, 0, base + H, 0);
   gable(k, W, D, base + H + 0.1, 0.58, 0.55, roof, wall, { t: 0.2, side: 0.45, rows: { step: 0.34, h: 0.07, w: 0.1, col: shade(roof, 0.7) }, ridge: shade(roof, 0.6), ridgeH: 0.2 });
   k.box(0.55, 1.7, 0.55, '#9c5a44', W*0.28, base + H + 1.0, -D*0.18); k.box(0.72, 0.12, 0.72, '#7a4434', W*0.28, base + H + 1.86, -D*0.18);
+  for(const dx of [-0.13, 0.13]) k.cyl(0.08, 0.09, 0.3, 6, '#b5653f', W*0.28 + dx, base + H + 2.05, -D*0.18);
+  for(let q=0;q<4;q++) k.box(0.58, 0.06, 0.58, shade('#9c5a44', q % 2 ? 0.85 : 1.05), W*0.28, base + H + 0.45 + q*0.32, -D*0.18);
+  // barge boards along both gable edges, in the trim colour
+  { const pitch = 0.58, half = D/2 + 0.55, y0 = base + H + 0.1, rise = (D/2)*Math.tan(pitch), L = half/Math.cos(pitch);
+    for(const sx of [-1, 1]) for(const sz of [-1, 1]) k.box(0.1, 0.24, L, trim, sx*(W/2 + 0.47), y0 + rise - (half/2)*Math.tan(pitch) + 0.1, sz*half/2, 0, sz*pitch); }
   k.box(1.15, 1.98, 0.1, trim, 0.9, base + 0.99, D/2 + 0.03); k.box(0.9, 1.78, 0.12, '#6b4a30', 0.9, base + 0.89, D/2 + 0.05);
   for(let j=0;j<3;j++) k.box(0.7, 0.04, 0.13, '#5a3c26', 0.9, base + 0.4 + j*0.5, D/2 + 0.06);
   k.ball(0.05, '#e8c25a', 1.2, base + 0.9, D/2 + 0.14);
@@ -124,6 +143,10 @@ function cottageKit(i, two = i % 3 === 1){
   if(two){ win1(k, -1.0, base + H*0.77, D/2 + 0.02, 0, trim, roof, { flowers: FLOW[(i + 1) % 4] }); win1(k, 1.0, base + H*0.77, D/2 + 0.02, 0, trim, roof); }
   k.glow(new THREE.BoxGeometry(0.16, 0.24, 0.16), 1.68, base + 1.95, D/2 + 0.16);
   k.cyl(0.06, 0.06, H, 5, '#8a8f93', W/2 + 0.12, base + H/2, D/2 + 0.12);
+  // a bench by the door, pots on the step
+  k.box(1.1, 0.07, 0.34, wood, 2.05, base + 0.42, D/2 + 0.5); for(const dx of [-0.45, 0.45]) k.box(0.07, 0.42, 0.3, wood, 2.05 + dx, base + 0.21, D/2 + 0.5);
+  k.box(1.1, 0.3, 0.05, wood, 2.05, base + 0.62, D/2 + 0.34);
+  for(const dx of [-0.25, 0.3]){ k.cyl(0.14, 0.11, 0.24, 7, '#c8734a', 0.9 + dx*2.3, 0.32, D/2 + 0.68); k.ball(0.2, '#4f9a3c', 0.9 + dx*2.3, 0.56, D/2 + 0.68, 1); }
   // a little front garden
   for(let j=0;j<6;j++) k.box(0.07, 0.5, 0.07, trim, -W/2 + 0.15 + j*0.36, 0.25, D/2 + 1.25);
   k.box(1.9, 0.05, 0.05, trim, -W/2 + 1.05, 0.38, D/2 + 1.25);
@@ -296,11 +319,17 @@ function tiered(vars, when, x, z, order, swap = false, big = 14){ TIERED.push({ 
   });
   // the dock: planks and posts, later a concrete pier with rails and street lights
   const dockW = new THREE.Group(); dio.add(dockW);
-  { const planks = [];
-    for(let z = -1.5; z <= 23.2; z += 0.62) planks.push(new THREE.BoxGeometry(2.8, 0.14, 0.52).translate(8 + (rng() - .5)*0.08, 0.84, z));
-    merged(planks, SM('#ad8257'), dockW);
+  { // a working jetty: planks of uneven tone and length on two stringers, cleats, coiled rope, a ladder down to the water
+    const dk = new Kit(); dk.noContact = true; const PT = ['#ad8257', '#a07650', '#b88c60', '#9a7049', '#b3875a'];
+    for(let z = -1.5, q = 0; z <= 23.2; z += 0.62, q++){ const sh = q % 5 === 2, w = 2.8 - (sh ? 0.25 : 0) + (rng() - .5)*0.1; dk.box(w, 0.14, 0.54, PT[(q*3 + (q >> 2)) % 5], 8 + (rng() - .5)*0.1 + (sh ? 0.12 : 0), 0.84, z, (rng() - .5)*0.03); }
+    for(const sx of [-0.95, 0.95]) dk.box(0.22, 0.26, 24.9, '#5e4630', 8 + sx, 0.64, 10.85);
+    for(let z = 0.5; z <= 22.5; z += 2.2) for(const sx of [-1, 1]){ dk.box(0.32, 0.1, 0.12, '#4a4440', 8 + sx*1.28, 0.97, z); dk.box(0.1, 0.12, 0.1, '#4a4440', 8 + sx*1.28, 0.93, z); }
+    for(const [x, z] of [[7.1, 6.2], [8.9, 14.5]]){ dk.cyl(0.32, 0.32, 0.08, 10, '#d8c39a', x, 0.95, z); dk.cyl(0.24, 0.24, 0.08, 10, '#c9b285', x, 1.03, z); dk.cyl(0.14, 0.14, 0.08, 8, '#d8c39a', x, 1.11, z); }
+    for(let r=0;r<5;r++) dk.box(0.5, 0.05, 0.06, '#5e4630', 6.55, 0.6 - r*0.38, 22.9); for(const dx of [-0.25, 0.25]) dk.box(0.06, 2.0, 0.06, '#5e4630', 6.55 + dx, 0.1, 22.9);
+    const dg = dk.build(0, 0, 0, 0); dio.remove(dg); dockW.add(dg);
     const posts = [];
-    for(let z = -1; z <= 23; z += 3) for(const sx of [-1.35, 1.35]){ const fh = dioH(8 + sx, z), h = 1.7 - fh; posts.push(new THREE.CylinderGeometry(0.15, 0.17, h, 6).translate(8 + sx, fh + h/2, z)); }
+    for(let z = -1; z <= 23; z += 3) for(const sx of [-1.35, 1.35]){ const fh = dioH(8 + sx, z), h = 1.7 - fh; posts.push(new THREE.CylinderGeometry(0.15, 0.17, h, 6).translate(8 + sx, fh + h/2, z));
+      posts.push(new THREE.CylinderGeometry(0.19, 0.19, 0.08, 6).translate(8 + sx, 1.72, z)); }
     merged(posts, SM('#6b5034'), dockW);
     for(const sx of [-1.35, 1.35]) dm(new THREE.CylinderGeometry(0.04, 0.04, 24, 4).rotateX(Math.PI/2), SM('#d8c39a'), 8 + sx, 1.55, 11, dockW);
     for(let k=0;k<4;k++) dm(new THREE.BoxGeometry(0.8, 0.7, 0.8), SM('#a0784e'), 7.2 + (k % 2)*0.9, 1.26, 20 + Math.floor(k/2)*0.9, dockW);
@@ -316,6 +345,9 @@ function tiered(vars, when, x, z, order, swap = false, big = 14){ TIERED.push({ 
   for(const z of [3, 11, 19]){ pier.cyl(0.13, 0.17, 0.32, 8, '#33383b', 6.55, 1.11, z + 1.6); pier.cyl(0.13, 0.17, 0.32, 8, '#33383b', 9.45, 1.11, z + 1.6); }
   for(const z of [1, 9, 17]){ pier.cyl(0.05, 0.07, 3.2, 6, '#a7b0b5', 9.55, 2.55, z); pier.box(0.9, 0.06, 0.08, '#a7b0b5', 9.15, 4.1, z); pier.glow(new THREE.BoxGeometry(0.4, 0.04, 0.16), 8.85, 4.06, z); }
   pier.box(1.3, 0.8, 0.9, '#2f78c4', 7.5, 1.35, 22.4); pier.box(0.9, 0.5, 0.6, '#f2f0e6', 7.5, 1.95, 22.4);
+  for(let z = -1.2; z <= 23; z += 2.4) pier.box(3.3, 0.012, 0.05, '#a9a59c', 8, 0.952, z);
+  for(let z = 1.5; z <= 22; z += 2.6) for(const sx of [-1, 1]) pier.geo(new THREE.TorusGeometry(0.26, 0.11, 6, 10).rotateY(Math.PI/2), '#2a2a2a', 8 + sx*1.76, 0.55, z);
+  for(const z of [6.5, 15.5]){ pier.box(0.08, 1.2, 0.08, '#d84a3a', 9.35, 1.55, z); pier.geo(new THREE.TorusGeometry(0.28, 0.07, 6, 12), '#ff6a3d', 9.35, 1.85, z + 0.05); }
   const pierG = pier.build(0, 0, 0, 0);
   tiered([dockW, dockW, pierG], () => true, 8, 10, 0, true, 26);
   // roads: dirt, then cobbles, then asphalt with kerbs
@@ -336,6 +368,8 @@ function tiered(vars, when, x, z, order, swap = false, big = 14){ TIERED.push({ 
     road.geo(ribbon(pl, -1.6, -1.35, 0.2), '#d9d6cf'); road.geo(ribbon(pl, 1.35, 1.6, 0.2), '#d9d6cf');
     road.geo(ribbon(pl, -2.3, -1.6, 0.16), '#c7c1b5'); road.geo(ribbon(pl, 1.6, 2.3, 0.16), '#c7c1b5');
     for(const s of samplePath(pl, 1.7)) road.box(0.12, 0.02, 0.75, '#f2f0e6', s.x, dioH(s.x, s.z) + 0.115, s.z, Math.atan2(s.dx, s.dz));
+    road.geo(ribbon(pl, -1.25, -1.17, 0.112), '#e9e6de'); road.geo(ribbon(pl, 1.17, 1.25, 0.112), '#e9e6de');
+    for(const s of samplePath(pl, 0.9)) for(const o of [-1.95, 1.95]){ const x = s.x - s.dz*o, z = s.z + s.dx*o; road.box(0.7, 0.012, 0.04, '#aaa395', x, dioH(x, z) + 0.17, z, Math.atan2(s.dx, s.dz) + Math.PI/2); }
   }
   const roadG = road.build(0, 0, 0, 0);
   tiered([null, cobIM, roadG], () => true, 0, -13, 2, true, 0);
@@ -572,6 +606,13 @@ function offshoreShip(color){   // a deep-sea longliner: high bow, wheelhouse af
   dm(new THREE.BoxGeometry(1.4, 0.08, 0.08), SM('#d9d9d9'), 0, 4.6, -L*0.05, g);
   dm(new THREE.CylinderGeometry(0.45, 0.45, 1.2, 12).rotateZ(Math.PI/2), SM('#c0392b'), 0, 1.25, L*0.2, g);
   for(const sx of [-1, 1]) dm(new THREE.BoxGeometry(0.1, 0.5, L*0.35), SM('#e8a33a'), sx*W*0.42, 1.0, L*0.15, g);
+  // bridge wings and a radar, a row of portholes, orange buoys racked on the rail, a waterline stripe, a lifeboat canister
+  dm(new THREE.BoxGeometry(W*1.02, 0.08, 0.6), SM('#f6f4ee'), 0, 2.45, -L*0.22 + L*0.13 + 0.2, g);
+  dm(new THREE.BoxGeometry(0.1, 0.35, 0.1), SM('#e8e8e8'), 0, 2.85, -L*0.22, g); dm(new THREE.BoxGeometry(1.2, 0.06, 0.16), SM('#e8e8e8'), 0, 3.05, -L*0.22, g);
+  for(const sx of [-1, 1]) for(let q=0;q<5;q++) dm(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8).rotateZ(Math.PI/2), SM('#d9e4ea'), sx*(W*0.5 - 0.02), 0.62, -L*0.3 + q*0.75, g);
+  for(let q=0;q<8;q++) dm(new THREE.SphereGeometry(0.13, 8, 6), SM(q % 2 ? '#ff6a3d' : '#ffd166'), (q % 2 ? 1 : -1)*W*0.36, 1.3, L*0.05 + Math.floor(q/2)*0.32, g);
+  dm(hullGeo(L*1.012, W*1.05, Hh*0.06), SM('#b8452f'), 0, 0.2 - Hh*0.1, 0, g);
+  dm(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 10).rotateX(Math.PI/2), SM('#ff7a3d'), W*0.3, 2.0, -L*0.38, g);
   dio.add(g); g.visible = false; return g;
 }
 for(let i=0;i<6;i++){ const g = offshoreShip(['#2f4f6f', '#7a2e2e', '#2f5f4f'][i % 3]); g.scale.setScalar(1.0); g.rotation.y = 0;   // bows out to sea, side by side

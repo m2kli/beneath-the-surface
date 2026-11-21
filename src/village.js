@@ -354,11 +354,29 @@ function makeBoat(color, kind){
     dm(new THREE.BoxGeometry(W*0.7, 0.06, L*0.4), SM('#ffffff'), 0, 1.4, -L*0.08, g);
     for(const sx of [-1, 1]) for(const sz of [-1, 1]) dm(new THREE.BoxGeometry(0.05, 0.8, 0.05), SM('#9aa'), sx*W*0.32, 1.0, -L*0.08 + sz*L*0.18, g);
     for(let k=0;k<3;k++) dm(new THREE.CapsuleGeometry(0.16, 0.3, 2, 6), SM(['#ff7a59', '#4fc3d9', '#ffd166'][k]), (k - 1)*0.4, 0.95, -L*0.15, g);
+    // rails round the deck, a bench, a life ring, a blue stripe on the canopy
+    const rl = SM('#c9d2d6'), dy = 0.15 + Hh*0.42;
+    for(const sx of [-1, 1]){ dm(new THREE.BoxGeometry(0.03, 0.03, L*0.62), rl, sx*W*0.36, dy + 0.42, -L*0.05, g);
+      for(let q=0;q<5;q++) dm(new THREE.BoxGeometry(0.025, 0.42, 0.025), rl, sx*W*0.36, dy + 0.21, -L*0.36 + q*L*0.155, g); }
+    dm(new THREE.BoxGeometry(W*0.5, 0.06, 0.25), SM('#c9a77a'), 0, dy + 0.3, -L*0.32, g);
+    dm(new THREE.TorusGeometry(0.15, 0.045, 5, 10), SM('#ff6a3d'), W*0.37, dy + 0.3, L*0.12, g).rotation.y = Math.PI/2;
+    dm(new THREE.BoxGeometry(W*0.72, 0.05, L*0.42), SM('#2f8fd6'), 0, 1.45, -L*0.08, g);
   } else {
     const cabH = big ? 1.5 : 0.8, cabL = L*(big ? 0.26 : 0.3), cz = big ? L*0.12 : -L*0.12;
     dm(new THREE.BoxGeometry(W*0.6, cabH, cabL), SM('#f1ece0'), 0, 0.6 + cabH/2, cz, g);
-    dm(new THREE.BoxGeometry(W*0.61, 0.24, cabL*1.01), winMat, 0, 0.6 + cabH*0.72, cz, g);
-    dm(new THREE.BoxGeometry(W*0.72, 0.1, cabL*1.2), SM(big ? '#b8452f' : color), 0, 0.65 + cabH, cz, g);
+    // framed panes: two across the front, two down each side, a door at the back
+    const cw = W*0.6, wy = 0.6 + cabH*0.68, ph = cabH*0.32, frame = SM('#3a4652');
+    for(const sx of [-1, 1]){ dm(new THREE.BoxGeometry(cw*0.4, ph, 0.04), winMat, sx*cw*0.23, wy, cz + cabL/2 + 0.01, g);
+      for(const sz of [-1, 1]) dm(new THREE.BoxGeometry(0.04, ph, cabL*0.36), winMat, sx*(cw/2 + 0.01), wy, cz + sz*cabL*0.22, g); }
+    dm(new THREE.BoxGeometry(0.05, ph + 0.06, 0.05), frame, 0, wy, cz + cabL/2 + 0.03, g);
+    dm(new THREE.BoxGeometry(cw*0.36, cabH*0.78, 0.04), SM('#5b6266'), 0, 0.6 + cabH*0.4, cz - cabL/2 - 0.01, g);
+    // roof: an overhang with a darker rim, a searchlight and an antenna; a radar bar on the trawler
+    const ry = 0.65 + cabH, rc = big ? '#b8452f' : color;
+    dm(new THREE.BoxGeometry(W*0.74, 0.1, cabL*1.25), SM(rc), 0, ry, cz + cabL*0.06, g);
+    dm(new THREE.BoxGeometry(W*0.76, 0.05, cabL*1.27), SM('#2b3a4a'), 0, ry - 0.07, cz + cabL*0.06, g);
+    dm(new THREE.CylinderGeometry(0.07, 0.09, 0.12, 8), SM('#e8e8e8'), W*0.2, ry + 0.11, cz + cabL*0.4, g);
+    dm(new THREE.CylinderGeometry(0.012, 0.012, big ? 1.4 : 0.9, 3), SM('#cccccc'), -W*0.22, ry + (big ? 0.75 : 0.5), cz - cabL*0.3, g);
+    if(big){ dm(new THREE.BoxGeometry(0.12, 0.3, 0.12), SM('#e8e8e8'), 0, ry + 0.2, cz, g); dm(new THREE.BoxGeometry(1.1, 0.06, 0.14), SM('#e8e8e8'), 0, ry + 0.38, cz, g); }
     if(!big){ dm(new THREE.CylinderGeometry(0.04, 0.05, 2.2, 5), SM('#6b5034'), 0, 1.7, L*0.18, g);
       dm(new THREE.BoxGeometry(0.03, 0.32, 0.5), SM('#ffd166'), 0, 2.6, L*0.18 - 0.28, g); }
     // working clutter: a white stripe along the hull, a life ring on the cabin, fish crates and a pile of net on the deck, a buoy on the bow
@@ -366,7 +384,8 @@ function makeBoat(color, kind){
     dm(new THREE.TorusGeometry(0.17, 0.05, 5, 10), SM('#ff6a3d'), W*0.31, 0.6 + cabH*0.45, cz, g).rotation.y = Math.PI/2;
     const deckY = 0.15 + Hh*0.42 + 0.04, sz = big ? -L*0.3 : L*0.1;
     for(let q=0;q<(big ? 4 : 2);q++) dm(new THREE.BoxGeometry(0.42, 0.24, 0.32), SM(q % 2 ? '#3a7bd5' : '#e8a33a'), (q % 2 - 0.5)*0.48, deckY + 0.12 + Math.floor(q/2)*0.24, sz - 0.5, g);
-    dm(new THREE.IcosahedronGeometry(0.34, 1).scale(1.2, 0.45, 1), SM('#3f6b5a'), 0.05, deckY + 0.1, sz + (big ? 0.6 : 0.35), g);
+    { const nz = sz + (big ? 0.6 : 0.35); dm(new THREE.IcosahedronGeometry(0.3, 1).scale(1.25, 0.32, 1), SM('#c4733a'), 0.05, deckY + 0.07, nz, g);
+      for(let f=0;f<3;f++) dm(new THREE.SphereGeometry(0.06, 6, 4), SM('#ffd166'), -0.18 + f*0.18, deckY + 0.16, nz + (f - 1)*0.12, g); }
     dm(new THREE.SphereGeometry(0.13, 8, 6), SM('#ff6a3d'), W*0.25, deckY + 0.15, L*0.36, g);
   }
   if(big){

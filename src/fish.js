@@ -46,7 +46,7 @@ const reg = makePool(NR, 1.7, 16), bait = makePool(NB, 0.22, 4);
   bait.sc.fill(sBait);
 }
 const fishVert = /* glsl */`
-attribute vec3 aPos; attribute vec3 aDir; attribute vec4 aSeed;
+attribute vec3 aPos; attribute vec3 aDir; attribute vec4 aSeed; attribute float aFin; varying float vFin;
 uniform float uTime;
 varying vec3 vN; varying vec3 vW; varying vec3 vL; varying float vSp; varying float vRnd;
 void main(){
@@ -56,7 +56,7 @@ void main(){
   else if(s > 10.5 && s < 11.5) k3 = vec3(0.75, 0.4, 1.8);   // barracuda: long and slim
   else if(s > 11.5 && s < 12.5) k3 = vec3(1.15, 1.18, 1.0);  // humphead parrotfish: bulky
   else if(s > 13.5) k3 = vec3(0.95, 0.92, 1.35);                // tuna: a torpedo
-  vec3 p = position * k3 * aSeed.y; vL = position; vSp = aSeed.z; vRnd = aSeed.w;
+  vec3 p = position * k3 * aSeed.y; vL = position; vSp = aSeed.z; vRnd = aSeed.w; vFin = aFin;
   float sp = length(aDir);
   float wig = sin(aSeed.x + position.z * 2.8) * (0.035 + 0.26 * smoothstep(0.3, -1.6, position.z));
   p.x += wig * aSeed.y;
@@ -67,7 +67,7 @@ void main(){
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
 const fishFrag = COMMON + /* glsl */`
-varying vec3 vN; varying vec3 vW; varying vec3 vL; varying float vSp; varying float vRnd;
+varying vec3 vN; varying vec3 vW; varying vec3 vL; varying float vSp; varying float vRnd; varying float vFin;
 void main(){
   vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
   vec3 vd = normalize(cameraPosition - vW);
@@ -104,7 +104,10 @@ void main(){
     c = mix(c, vec3(1.0), band); c = mix(c, vec3(0.02), smoothstep(0.02, 0.0, abs(abs(abs(vL.z - 0.1) - 0.42) - 0.065)) * 0.8); }
   if(s > 1.5 && s < 2.5) c = mix(c, vec3(1.0, 0.85, 0.35), smoothstep(0.08, 0.0, abs(vL.y + 0.02 - vL.z*0.2)) * 0.6);
   if(s > 0.5 && s < 1.5) c = mix(c, vec3(0.3, 0.9, 1.0), smoothstep(0.1, 0.3, vL.y) * 0.5);
-  vec3 alb = mix(c, vec3(0.96), smoothstep(0.0, -0.3, vL.y) * 0.55);
+  // fins: lighter and thinner-looking than the body, with fine rays; the body gets a gill line behind the eye
+  if(vFin > 0.5){ float ray = 0.8 + 0.2*sin(atan(vL.y, vL.z + 0.85)*46.0); c = mix(c, c*1.2 + 0.06, 0.45) * ray; silver *= 0.4; }
+  else c *= 1.0 - 0.3*smoothstep(0.035, 0.0, abs(vL.z - 0.5 + 0.35*vL.y*vL.y)) * step(abs(vL.y), 0.3);
+  vec3 alb = mix(c, vec3(0.96), smoothstep(0.0, -0.3, vL.y) * 0.55 * (1.0 - vFin));
   float eye = smoothstep(0.075, 0.055, length(vec2(vL.z - 0.66, vL.y - 0.07)));
   alb = mix(alb, vec3(0.02), eye);
   alb *= 1.0 - silver * 0.55;
@@ -113,27 +116,41 @@ void main(){
   vec3 R = reflect(-vd, n);
   vec3 L = sunAt(vW.y);
   vec3 env = mediumLight(R, vW.y) * 2.5 + L * (smoothstep(0.25, 0.95, R.y) * 0.55 + pow(max(dot(R, uSunDir), 0.0), 28.0) * 3.0);
-  col += env * mix(0.03 + 0.25 * fres, 0.95, silver);
+  col += env * mix(0.03 + 0.25 * fres, 0.62, silver);
   col += eye * L * pow(max(dot(R, uSunDir), 0.0), 80.0) * 3.0;
   gl_FragColor = vec4(fogged(col, vW), 1.0);
 }`;
 let fishBase;
 {
-  const body = new THREE.SphereGeometry(1, 16, 12); body.scale(0.16, 0.38, 1.0);
+  const body = new THREE.SphereGeometry(1, 20, 14); body.scale(0.16, 0.38, 1.0);
   const p = body.attributes.position;
   for(let i=0;i<p.count;i++){ const z = p.getZ(i); if(z < 0){ const k = 1 - 0.8*Math.min(1, -z); p.setX(i, p.getX(i)*k); p.setY(i, p.getY(i)*k); }
     else { p.setY(i, p.getY(i)*(1 - 0.15*z)); } }
   body.computeVertexNormals();
-  const tri = (pts, nrm = [1, 0, 0]) => { const g = new THREE.BufferGeometry();
+  const geo = (pts, nrm = [1, 0, 0]) => { const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(pts.map(() => nrm).flat(), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(pts.map(() => [0, 0]).flat(), 2));
     return g; };
-  const tail = tri([[0,0,-0.82],[0,0.56,-1.62],[0,0.05,-1.22], [0,0,-0.82],[0,-0.05,-1.22],[0,-0.56,-1.62]]);
-  const dorsal = tri([[0,0.33,0.35],[0,0.62,-0.2],[0,0.25,-0.55]]);
-  const anal = tri([[0,-0.26,-0.15],[0,-0.42,-0.45],[0,-0.18,-0.6]]);
-  const pect = tri([[0.15,-0.08,0.35],[0.42,-0.22,0.02],[0.14,-0.12,0.12], [-0.15,-0.08,0.35],[-0.42,-0.22,0.02],[-0.14,-0.12,0.12]], [0, 1, 0]);
-  fishBase = mergeGeometries([body.toNonIndexed(), tail, dorsal, anal, pect]);
+  // a fin as a strip between a base line on the body and a curved outer edge (both lists of [y, z]), in the x = 0 plane unless lifted
+  const strip = (base, edge, x0 = 0, x1 = 0) => { const t = [];
+    for(let i=0;i<base.length - 1;i++){ const A = [x0, ...base[i]], B = [x0, ...base[i + 1]], C = [x1, ...edge[i + 1]], D = [x1, ...edge[i]]; t.push(A, B, C, A, C, D); }
+    return t; };
+  // forked tail: a fan from the narrow peduncle out to two swept lobes
+  const tailEdge = [[0.6, -1.66], [0.46, -1.52], [0.3, -1.38], [0.13, -1.28], [0, -1.24], [-0.13, -1.28], [-0.3, -1.38], [-0.46, -1.52], [-0.6, -1.66]];
+  const tailBase = tailEdge.map((e, i) => [0.075 - 0.15*i/(tailEdge.length - 1), -0.8]);
+  const tail = geo(strip(tailBase, tailEdge));
+  // dorsal: rises to a soft peak behind the head and tapers back toward the tail
+  const dz = [0.38, 0.25, 0.1, -0.05, -0.2, -0.35, -0.5], dorsal = geo(strip(dz.map(z => [0.36 - 0.12*Math.max(0, -z), z]), dz.map((z, i) => [0.36 - 0.12*Math.max(0, -z) + [0.05, 0.22, 0.27, 0.24, 0.19, 0.13, 0.04][i], z - 0.06])));
+  const az = [-0.12, -0.25, -0.38, -0.52, -0.62], anal = geo(strip(az.map(z => [-0.25 + 0.08*Math.max(0, -z - 0.2), z]), az.map((z, i) => [-0.25 + 0.08*Math.max(0, -z - 0.2) - [0.03, 0.15, 0.17, 0.11, 0.02][i], z - 0.05])));
+  // pectoral and pelvic fins: small fans swept back, one each side
+  const fan = (sx, y, z, len, drop) => [[sx*0.14, y, z], [sx*(0.14 + len), y - drop, z - len*0.9], [sx*0.13, y - 0.04, z - 0.18],
+    [sx*0.14, y, z], [sx*(0.14 + len*0.7), y - drop*1.3, z - len*0.5], [sx*(0.14 + len), y - drop, z - len*0.9]];
+  const pect = geo([...fan(1, -0.08, 0.36, 0.32, 0.12), ...fan(-1, -0.08, 0.36, 0.32, 0.12)], [0, 1, 0]);
+  const pelv = geo([...fan(1, -0.3, 0.15, 0.16, 0.12), ...fan(-1, -0.3, 0.15, 0.16, 0.12)], [0, 1, 0]);
+  const bodyN = body.toNonIndexed(), parts = [bodyN, tail, dorsal, anal, pect, pelv];
+  parts.forEach((g, i) => g.setAttribute('aFin', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(i ? 1 : 0), 1)));
+  fishBase = mergeGeometries(parts);
 }
 function makeFishMesh(pool){
   const geo = new THREE.InstancedBufferGeometry().copy(fishBase);
