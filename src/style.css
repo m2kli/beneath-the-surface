@@ -154,6 +154,10 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:cros
 .smk i{width:9px;height:9px;border-radius:50%;background:var(--c);animation:smkp 2.4s infinite}
 .smk.survey{--c:#4fd8ff}.smk.cots{--c:#ff5fa8}.smk.trash{--c:#e8b84a}.smk.net{--c:#ff8a2a}.smk.ev{--c:#ffffff}
 .smk.ev i{animation-duration:1.4s}
+/* pin: a stem from the label down to the exact spot, ending in a small dot */
+.smk::after{content:'';position:absolute;left:9px;top:100%;width:1.5px;height:var(--stem,19px);margin-left:-.75px;background:linear-gradient(rgba(255,255,255,.75),var(--c));pointer-events:none}
+.smk::before{content:'';position:absolute;left:9px;top:calc(100% + var(--stem,19px));width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px rgba(8,42,52,.45),0 0 8px var(--c);pointer-events:none}
+.smk:hover{box-shadow:0 0 0 2px var(--c)}
 @keyframes smkp{0%{box-shadow:0 0 0 0 var(--c)}70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
 .mk{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);
   box-shadow:0 0 12px rgba(120,240,255,.9),inset 0 0 6px rgba(120,240,255,.6);opacity:0;transition:opacity .3s,transform .25s}

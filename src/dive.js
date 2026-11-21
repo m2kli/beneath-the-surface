@@ -210,13 +210,14 @@ function seaMarkItems(S){
 }
 function updateSeaMarks(){
   const S = V.sea, show = mode === 'village' && !!S && document.body.classList.contains('started') && !$('intro').classList.contains('on') && !sysOpen && ['plan', 'report'].includes(state) && !zoom && !unzoom && !$('village').classList.contains('modal');
-  if(!show){ for(const el of seaMk.els) el.classList.remove('on'); return; }
+  if(!show){ for(const el of seaMk.els) el.classList.remove('on'); seaMk.hover = false; return; }
   if(sea3.seed !== S.seed) layoutSea(S);
   if(time - seaMk.t > 0.5){ seaMk.t = time; seaMk.list = seaMarkItems(S); }
   seaMk.list.forEach((it, i) => {
     let el = seaMk.els[i];
     if(!el){ el = document.createElement('button'); el.type = 'button';
       el.onclick = () => { const m = seaMk.list[+el.dataset.i]; if(!m || !['plan', 'report'].includes(state) || zoom) return; if(focusOn) exitFocus(); diveInto({ pos: () => pC.copy(m.pos) }, 'free'); };
+      el.onpointerenter = () => { seaMk.hover = true; }; el.onpointerleave = () => { seaMk.hover = false; };
       $('marks').appendChild(el); seaMk.els.push(el); }
     el.dataset.i = i;
     const txt = it.label + (it.n > 1 ? ' ×' + it.n : '');
@@ -225,11 +226,11 @@ function updateSeaMarks(){
     if(ok){ it.sx = (p.x*0.5 + 0.5)*innerWidth; it.sy = (-p.y*0.5 + 0.5)*innerHeight; ok = !underUI(it.sx, it.sy) && !!portalVisibleAt(it.sx, it.sy); }
     it.ok = ok; el.classList.toggle('on', ok);
   });
-  // labels that land on top of each other stack downward instead
-  const placed = [];
-  seaMk.list.map((it, i) => [it, seaMk.els[i]]).filter(([it]) => it.ok).sort((a, b) => a[0].sy - b[0].sy).forEach(([it, el]) => {
-    let y = it.sy; const w = 18 + it.label.length*12;
-    for(let k=0;k<6;k++){ const hit = placed.find(q => Math.abs(q.x - it.sx) < (q.w + w)/2 && Math.abs(q.y - y) < 22); if(!hit) break; y = hit.y + 22; }
-    placed.push({ x: it.sx, y, w }); el.style.transform = `translate(${it.sx.toFixed(1)}px, ${y.toFixed(1)}px)`; });
+  // each label is a pin: it floats above its spot with a stem down to it. Labels that would overlap stack upward, and their stems get longer.
+  const placed = [], RISE = 30;
+  seaMk.list.map((it, i) => [it, seaMk.els[i]]).filter(([it]) => it.ok).sort((a, b) => b[0].sy - a[0].sy).forEach(([it, el]) => {
+    let y = it.sy - RISE; const w = 26 + (it.label.length + (it.n > 1 ? 2 : 0))*12;
+    for(let k=0;k<6;k++){ const hit = placed.find(q => Math.abs(q.x - it.sx) < (q.w + w)/2 + 4 && Math.abs(q.y - y) < 24); if(!hit) break; y = hit.y - 24; }
+    placed.push({ x: it.sx, y, w }); el.style.transform = `translate(${it.sx.toFixed(1)}px, ${y.toFixed(1)}px)`; el.style.setProperty('--stem', (it.sy - y - 11).toFixed(1) + 'px'); });
   for(let i = seaMk.list.length; i < seaMk.els.length; i++) seaMk.els[i].classList.remove('on');
 }
