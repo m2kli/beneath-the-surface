@@ -119,7 +119,7 @@ float waterPath(vec3 wp){
 }
 vec3 fogged(vec3 col, vec3 wp){
   clipPortal(wp);
-  vec3 v = wp - cameraPosition; float d = waterPath(wp) * (uPortal > 0.5 ? 2.4 : 1.0);
+  vec3 v = wp - cameraPosition; float d = waterPath(wp) * (uPortal > 0.5 ? 1.2 : 1.0);
   vec3 T = exp(-(uAbs + uSca) * d);
   return col * T + mediumLight(normalize(v), uPortal > 0.5 ? SURF - 1.0 : cameraPosition.y) * (1.0 - T);
 }

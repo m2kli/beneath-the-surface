@@ -426,7 +426,7 @@ const ANEMONE_SPOTS = [];
       clipPortal(vW);
       float across = 1.0 - abs(vUv.y*2.0 - 1.0);
       float along = sin(vUv.x*3.14159);
-      float a = across*across*along*vA*0.15*mix(0.5, 1.0, uHealth);
+      float a = across*across*along*vA*0.15*mix(0.5, 1.0, uHealth)*mix(1.0, 0.45, uPortal); // from the shore they read as streaks on the water, so fainter
       gl_FragColor = vec4(mix(vec3(0.7, 0.9, 1.0), sunAt(vW.y)*0.35, 0.5) * a * transmit(waterPath(vW)), 1.0);
     }`,
   }));

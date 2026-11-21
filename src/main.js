@@ -1,7 +1,7 @@
 'use strict';
 // ======================================================================= frame
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3(), camDir = new THREE.Vector3();
-const MED = { dA: [0.036, 0.032, 0.046], dS: [0.052, 0.056, 0.044], aA: [0.024, 0.0068, 0.0042], aS: [0.0026, 0.0048, 0.0068] };
+const MED = { dA: [0.036, 0.032, 0.046], dS: [0.052, 0.056, 0.044], aA: [0.024, 0.0068, 0.0042], aS: [0.0014, 0.0026, 0.0038] }; // healthy water is clear: little scattering, so the reef reads crisply; murk comes from the degraded end (dA, dS)
 updateTurtle(0, 0);
 updateSchools(0);
 for(const pool of [reg, bait]) for(let i=0;i<pool.n;i++) spawnFish(pool, i, false);
@@ -151,9 +151,10 @@ function underUI(x, y){
   for(const r of uiRects) if(x > r[0] && x < r[2] && y > r[1] && y < r[3]) return true;
   return false;
 }
+let pulseSet = null;
 function updateMarks(){
   const canClick = ['plan', 'report', 'over'].includes(state) && !zoom && document.body.classList.contains('started') && !sysOpen;
-  let best = null, bd = 70;
+  let best = null, bd = 46;
   for(const m of MARKS){
     m.vis = false;
     if(canClick){
@@ -165,9 +166,18 @@ function updateMarks(){
     }
     if(m.vis && !underUI(mouseVX, mouseVY)){ const d = Math.hypot(m.sx - mouseVX, m.sy - mouseVY); if(d < bd){ bd = d; best = m; } }
   }
+  if(seaMk.hover) best = null; // pointing at an underwater-job pin: don't also light up a creature behind it
   hotMark = best;
+  // first season hint: now and then a few creatures (at most 4, spread out, away from the job pins) flash their ring, so it's clear they can be clicked
   const pulse = V.season <= 1 && state === 'plan' && (time % 7) < 1.4;
-  for(const m of MARKS){ m.el.classList.toggle('on', m.vis && (m === best || pulse)); m.el.classList.toggle('hot', m === best);
+  if(pulse && !pulseSet){ pulseSet = new Set(); const pins = seaMk.list.filter(it => it.ok);
+    for(const m of MARKS.filter(m => m.vis).sort((a, b) => Math.hypot(a.sx - innerWidth/2, a.sy - innerHeight/2) - Math.hypot(b.sx - innerWidth/2, b.sy - innerHeight/2))){
+      if(pulseSet.size >= 4) break;
+      if(pins.some(it => Math.hypot(it.sx - m.sx, it.sy - m.sy) < 80)) continue;
+      if([...pulseSet].some(q => Math.hypot(q.sx - m.sx, q.sy - m.sy) < 140)) continue;
+      pulseSet.add(m); } }
+  if(!pulse) pulseSet = null;
+  for(const m of MARKS){ m.el.classList.toggle('on', m.vis && (m === best || (pulseSet && pulseSet.has(m)))); m.el.classList.toggle('hot', m === best);
     if(m.vis){ m.el.style.left = m.sx + 'px'; m.el.style.top = m.sy + 'px'; } }
   renderer.domElement.style.cursor = mode === 'village' ? (best ? 'pointer' : 'grab') : 'crosshair';
 }
@@ -264,7 +274,7 @@ function oceanLook(dt, fromShore){
     if(bloomV > 0.005){ const b = bloomV; U.uSca.value.x += b*0.028; U.uSca.value.y += b*0.008; U.uSca.value.z += b*0.0015; U.uAbs.value.y += b*0.012; U.uAbs.value.z += b*0.032; } }
   U.uSunCol.value.set(lerp(3.3, 0.2, night), lerp(3.15, 0.28, night), lerp(2.9, 0.5, night));
   if(fromShore) U.uSunCol.value.multiplyScalar(lerp(1, 0.42, wx.grey));
-  finalPass.uniforms.uExposure.value = lerp(1.45, 0.82, e) * lerp(1, fromShore || state === 'ending' ? 2.8 : 2.0, night) * (fromShore ? 0.9*lerp(1, 0.78, wx.grey) : 1);
+  finalPass.uniforms.uExposure.value = lerp(1.45, fromShore ? 0.82 : 0.68, e) * lerp(1, fromShore || state === 'ending' ? 2.8 : 2.0, night) * (fromShore ? 0.9*lerp(1, 0.78, wx.grey) : 1);
   volMat.uniforms.uVolGain.value = lerp(0.3, 1.25, e);
   bloom.strength = lerp(0.3, 0.5, e) + night*0.25;
   if(spawnU.uSpawn.value > 0) spawnU.uSpawn.value += dt;
