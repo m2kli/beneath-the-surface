@@ -274,20 +274,26 @@ function house(color, roof, two){
   if(two){ win(-1.05, base + H*0.76, D/2 + 0.05, 0); win(1.05, base + H*0.76, D/2 + 0.05, 0); }
   return g;
 }
+// canopy blob with baked light: darker underneath and on the inside, lighter on top, so a tree reads as a rounded mass
+function blob(r, detail = 1){
+  const g = new THREE.IcosahedronGeometry(r, detail).toNonIndexed(), p = g.attributes.position, c = new Float32Array(p.count*3);
+  for(let i=0;i<p.count;i++){ const y = p.getY(i)/r, k = 0.58 + 0.5*smooth(-1, 1, y) + 0.06*(rng() - 0.5); c.set([k, k, k*0.97], i*3); }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
+}
 function tree(x, z, s){
   const g = new THREE.Group(); g.position.set(x, dioH(x, z), z); g.scale.setScalar(s); g.rotation.y = rng()*6; dio.add(g); SWAY.push({ g, ph: Math.random()*6, k: 1 });
   const bark = SM('#6f4e33');
   dm(new THREE.CylinderGeometry(0.26, 0.45, 4.2, 7), bark, 0, 2.1, 0, g);
   dm(new THREE.CylinderGeometry(0.1, 0.18, 2, 5), bark, 0.6, 3.6, 0, g).rotation.z = -0.8;
-  const m1 = SM('#5f9a3c'), m2 = SM('#76b04a'); m1.userData.v = rng(); m2.userData.v = rng(); canopyMats.push(m1, m2);
+  const m1 = SM('#5f9a3c', { vertexColors: true }), m2 = SM('#76b04a', { vertexColors: true }); m1.userData.v = rng(); m2.userData.v = rng(); canopyMats.push(m1, m2);
   for(let k=0;k<8;k++){ const a = k*0.8 + rng(), r = k ? 1.3 + rng()*0.6 : 0;
-    dm(new THREE.IcosahedronGeometry(1.25 + rng()*0.7, 1), k % 2 ? m1 : m2, Math.cos(a)*r, 4.6 + rng()*1.4 + (k ? 0 : 1), Math.sin(a)*r, g); }
+    dm(blob(1.25 + rng()*0.7), k % 2 ? m1 : m2, Math.cos(a)*r, 4.6 + rng()*1.4 + (k ? 0 : 1), Math.sin(a)*r, g); }
   return g;
 }
 function bush(x, z, s){
   const g = new THREE.Group(); g.position.set(x, dioH(x, z), z); g.scale.setScalar(s); dio.add(g); SWAY.push({ g, ph: Math.random()*6, k: 0.6 });
-  const m = SM(rng() < 0.5 ? '#5a9238' : '#6fa847'); m.userData.v = rng(); canopyMats.push(m);
-  for(let k=0;k<4;k++) dm(new THREE.IcosahedronGeometry(0.55 + rng()*0.35, 1), m, (rng() - .5)*1.2, 0.4 + rng()*0.3, (rng() - .5)*1.2, g);
+  const m = SM(rng() < 0.5 ? '#5a9238' : '#6fa847', { vertexColors: true }); m.userData.v = rng(); canopyMats.push(m);
+  for(let k=0;k<4;k++) dm(blob(0.55 + rng()*0.35), m, (rng() - .5)*1.2, 0.4 + rng()*0.3, (rng() - .5)*1.2, g);
   if(rng() < 0.5) for(let k=0;k<3;k++) dm(new THREE.IcosahedronGeometry(0.12, 0), SM(['#ff7aa2', '#fff1a8', '#ff9f43'][k]), (rng() - .5)*1.3, 0.9, (rng() - .5)*1.3, g);
 }
 function palm(x, z, s){
@@ -416,6 +422,22 @@ function makeBoat(color, kind){
   [[-44, -44, 1.3], [-36, -46, 1.1], [-20, -44, 1.2], [-6, -42, 1.0], [10, -45, 1.3], [24, -42, 1.1], [40, -44, 1.2], [44, -30, 1.0], [-45, -30, 1.1], [42, -22, 0.9], [-12, -33, 0.9], [8, -33, 1.0], [30, -31, 0.95], [-38, -38, 0.8], [18, -38, 0.85]].forEach(([x, z, s]) => tree(x, z, s));
   [[-38, 0.5], [-30, -1], [0, 0.5], [22, 0.2], [30, -1.5], [44, 0], [-46, -1], [38, -2]].forEach(([x, z]) => palm(x, z, 0.75 + rng()*0.3));
   for(let k=0;k<26;k++){ const x = -44 + rng()*88, z = -44 + rng()*38; if(pathDist(x, z) < 3.0 || Math.abs(x - 8) < 3) continue; bush(x, z, 0.7 + rng()*0.6); }
+  // lawn detail: grass tufts, wildflowers and pebbles, instanced, kept off paths, sand and building plots
+  {
+    const spots = []; for(let k=0;k<6000 && spots.length < 2200;k++){ const x = -49 + rng()*98, z = -88 + rng()*90, h = dioH(x, z);
+      if(h < 1.5 || pathDist(x, z) < 1.4) continue; spots.push([x, h, z]); }
+    const blade = new THREE.ConeGeometry(0.09, 0.7, 3).translate(0, 0.35, 0), tuftParts = [];
+    for(let i=0;i<5;i++){ const b = blade.clone(); b.rotateZ((rng() - 0.5)*0.7); b.rotateY(i*1.3); b.translate((rng() - 0.5)*0.35, 0, (rng() - 0.5)*0.35); b.scale(1, 0.7 + rng()*0.6, 1); tuftParts.push(b); }
+    // lit like the ground (normals straight up) and coloured like the grass, a touch lighter, so tufts read as texture, not stubble
+    const tg = mergeGeometries(tuftParts), tn = tg.attributes.normal; for(let i=0;i<tn.count;i++) tn.setXYZ(i, 0, 1, 0);
+    const tuftMat = dio.userData.tuftMat = new THREE.MeshStandardMaterial({ color: '#8cc458', roughness: 0.95 }); tuftMat.userData.base = tuftMat.color.clone();
+    const tufts = new THREE.InstancedMesh(tg, tuftMat, 1700), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+    let n = 0; for(const [x, h, z] of spots.slice(0, 1700)){ Q.setFromAxisAngle(Y, rng()*6.28); S.setScalar(0.5 + rng()*0.5); M.compose(P.set(x, h - 0.05, z), Q, S); tufts.setMatrixAt(n++, M); }
+    tufts.count = n; tufts.receiveShadow = true; dio.add(tufts);
+    const flower = new THREE.IcosahedronGeometry(0.16, 0), fl = new THREE.InstancedMesh(flower, new THREE.MeshStandardMaterial({ roughness: 0.7, flatShading: true }), 420), FC = ['#ff8fb1', '#fff3b0', '#ffffff', '#ffb35c', '#c9a7ff'].map(h => new THREE.Color(h));
+    n = 0; for(const [x, h, z] of spots.slice(1700)){ for(let j=0;j<1 + Math.floor(rng()*3) && n < 420;j++){ M.compose(P.set(x + (rng() - 0.5)*0.8, h + 0.22 + rng()*0.15, z + (rng() - 0.5)*0.8), Q, S.setScalar(0.8 + rng()*0.6)); fl.setMatrixAt(n, M); fl.setColorAt(n, FC[Math.floor(rng()*FC.length)]); n++; } }
+    fl.count = n; fl.castShadow = true; dio.add(fl); dio.userData.flowers = fl;
+  }
   for(let k=0;k<22;k++){ const x = -46 + rng()*92, z = -46 + rng()*50; const rk = dm(new THREE.IcosahedronGeometry(0.4 + rng()*0.8, 0), SM(rng() < 0.5 ? '#9a958c' : '#b3ab9e'), x, dioH(x, z) + 0.1, z); rk.rotation.set(rng()*3, rng()*3, rng()*3); rk.scale.y = 0.6; }
   for(let k=0;k<40;k++){ const side = k % 4, t = rng()*100 - 50, y = -2.5 - rng()*14;
     const [x, z] = side === 0 ? [t, 50.3] : side === 1 ? [50.3, t] : side === 2 ? [t, -50.3] : [-50.3, t];

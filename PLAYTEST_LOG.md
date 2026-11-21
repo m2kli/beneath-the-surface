@@ -93,3 +93,15 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - **Playbot:** it now measures where panels come to rest. A hidden tab freezes CSS transitions mid-way, which had reported the report card as off screen when it wasn't.
 - **Dev server:** the stylesheet is cache-busted on localhost like the scripts.
 - **Balance suite:** identical to the baseline.
+
+## Round 8: the user's look feedback (clear water, markers, winter, village)
+
+- **Water too murky.** From the shore, the water block doubled the haze path (×2.4), and healthy water still scattered a lot. Now the path is ×1.2, healthy scattering is about half, and the current ribbons are fainter from the shore. Clean water is clear down to the reef. Half-polluted water still looks good, and only badly polluted water goes murky green-brown. Underwater exposure is lower in clear water, so the sand isn't blown out.
+- **Markers overlapping.** The creature pick reached 70 px from the cursor, so pointing at a job marker also lit up a creature ring. Job markers were flat labels that slid away from their spot when they stacked. Now:
+  - job markers are pins with a stem down to the exact spot (stacked pins get longer stems);
+  - creature rings stay off while the cursor is on a pin, and the pick radius is 46 px;
+  - the first-season hint flashes at most 4 well-spaced rings instead of all ~25.
+- **Winter.** Trees turned grey-sage (palms too) while the grass stayed bright green. It's now a subtropical year: the grass takes the season's tint (golden in autumn, dry khaki in winter), only some broadleaf trees turn amber in autumn, winter is olive, palms stay green, and there are no wildflowers in winter.
+- **Village, first pass.** Canopies have baked light (darker underneath, lighter on top), so trees read as rounded masses. The lawns have grass tufts, wildflowers and pebbles. Village frame ~12 ms.
+- **Found and fixed:** the marine-snow shader used `uNight` without declaring it, so since round 4 it never compiled: no marine snow, no night plankton. It renders again.
+- **Still open:** houses, docks and the bigger town tiers could use a proper modelling pass.

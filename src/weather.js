@@ -193,7 +193,8 @@ function updateDiorama(dt){
   // --- the season colours the trees
   const si = V.season % 4, sk = Math.min(1, dt*(running ? 0.8 : 3));
   for(const m of canopyMats){ const alt = m.userData.v < (si === 2 ? 0.45 : 0.3); tmpCol.copy(alt ? SEASON_ALT[si] : SEASON_COL[si]).offsetHSL((m.userData.v - 0.5)*0.04, 0, (m.userData.v - 0.5)*0.08); m.color.lerp(tmpCol, sk); }
-  grassTint.value.lerp(GRASS_TINT[si], sk);
+  grassTint.value.lerp(GRASS_TINT[si], sk); if(dio.userData.flowers) dio.userData.flowers.visible = si !== 3;
+  { const tm = dio.userData.tuftMat; if(tm){ const gt = grassTint.value; tm.color.copy(tm.userData.base); tm.color.r *= gt.x; tm.color.g *= gt.y; tm.color.b *= gt.z; } } // no wildflowers in the dry winter
   // --- clouds race across during the time-lapse
   for(const c of clouds){ c.g.position.x += dt*(running ? 34 : 1.2 + wx.wind*5)*c.sp; if(c.g.position.x > 120) c.g.position.x = -120; }
   controls.autoRotate = (running || state === 'intro') && !zoom; controls.autoRotateSpeed = state === 'intro' ? 0.6 : 1.4;
