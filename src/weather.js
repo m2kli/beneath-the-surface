@@ -187,6 +187,7 @@ function updateDiorama(dt){
   moonL.intensity = 1.1*nightW;
   bgMat.uniforms.top.value.copy(SKY.day[0]).multiplyScalar(dayW).add(tmpCol.copy(SKY.dusk[0]).multiplyScalar(duskW)).add(tmpCol.copy(SKY.night[0]).multiplyScalar(nightW));
   bgMat.uniforms.bot.value.copy(SKY.day[1]).multiplyScalar(dayW).add(tmpCol.copy(SKY.dusk[1]).multiplyScalar(duskW)).add(tmpCol.copy(SKY.night[1]).multiplyScalar(nightW));
+  winMat.envMapIntensity = 1.2*(dayW + duskW*0.5) + 0.05; vcMat.envMapIntensity = 0.35*(dayW + duskW*0.5); glassMat.envMapIntensity = 1.4*(dayW + duskW*0.5) + 0.1;
   winMat.emissiveIntensity = nightW*2.0 + duskW*0.7; lampMat.emissiveIntensity = nightW*2.0 + duskW*0.7 + (V.pol.work === 'festival' ? 1.2 : 0);
   dioNight = nightW; portalU.uDay.value = dayW + duskW*0.7;
   applyWeather(dt, t, running, dayW, duskW, nightW);

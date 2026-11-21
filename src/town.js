@@ -5,6 +5,7 @@ const KM = new THREE.Matrix4(), KV = new THREE.Vector3(), KQ = new THREE.Quatern
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const vcMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, flatShading: true });
 const glassMat = new THREE.MeshStandardMaterial({ color: '#cfeef2', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.4, depthWrite: false });
+vcMat.envMap = skyEnv; vcMat.envMapIntensity = 0.35; glassMat.envMap = skyEnv; glassMat.envMapIntensity = 1.4;
 class Kit {
   constructor(){ this.L = { p: [], w: [], l: [], g: [] }; }
   put(list, geo, col, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0){
@@ -12,8 +13,9 @@ class Kit {
     if(g.attributes.uv) g.deleteAttribute('uv');
     if(g.attributes.uv1) g.deleteAttribute('uv1');
     g.applyMatrix4(KM.compose(KV.set(x, y, z), KQ.setFromEuler(KE.set(rx, ry, rz, 'YXZ')), K1));
-    if(list === 'p'){ KC.set(col); const n = g.attributes.position.count, a = new Float32Array(n*3);
-      for(let i=0;i<n;i++){ a[i*3] = KC.r; a[i*3 + 1] = KC.g; a[i*3 + 2] = KC.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+    // baked light: each part gets a slight tone of its own, and everything darkens toward the ground (walls meet the earth, eaves shade the top of the wall)
+    if(list === 'p'){ KC.set(col); const n = g.attributes.position.count, a = new Float32Array(n*3), pp = g.attributes.position, j = 1 + (Math.random() - 0.5)*0.07;
+      for(let i=0;i<n;i++){ const y = pp.getY(i), k = j*(0.66 + 0.34*Math.min(1, Math.max(0, y/1.6))); a[i*3] = KC.r*k; a[i*3 + 1] = KC.g*k; a[i*3 + 2] = KC.b*k; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
     this.L[list].push(g); return this;
   }
   box(w, h, d, col, x, y, z, ry, rx, rz){ return this.put('p', new THREE.BoxGeometry(w, h, d), col, x, y, z, ry, rx, rz); }
@@ -27,6 +29,8 @@ class Kit {
     const g = new THREE.Group(); g.position.set(x, y ?? dioH(x, z), z); g.rotation.y = ry;
     const mk = (list, mat, cast) => { if(!list.length) return; const m = new THREE.Mesh(mergeGeometries(list), mat); m.castShadow = cast; m.receiveShadow = true; g.add(m); };
     mk(this.L.p, vcMat, true); mk(this.L.w, winMat, false); mk(this.L.l, lampMat, false); mk(this.L.g, glassMat, false);
+    if(!this.noContact && g.children[0]){ const gg = g.children[0].geometry; gg.computeBoundingBox(); const bb = gg.boundingBox, sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z;
+      if(sx > 0.8 && sz > 0.8 && sx < 30 && sz < 30 && bb.min.y > -1) g.add(contactShadow(sx, sz, (bb.min.x + bb.max.x)/2, (bb.min.z + bb.max.z)/2)); }
     dio.add(g); return g;
   }
 }
@@ -131,7 +135,7 @@ function cottageKit(i, two = i % 3 === 1){
 // tier 2: a modern guesthouse with balconies, a café front and solar on the roof
 function modernKit(i, F = i % 3 === 1 ? 3 : 2){
   const k = new Kit(), fh = 1.85, W = 4.8, D = 4.2, b0 = 0.3;
-  const wall = ['#f4f1ea', '#e9eef0', '#f3e6d8', '#dfeee8', '#f1e2e6'][i % 5], accent = TILE[i % TILE.length], slab = '#fbfaf6', steel = '#5b6266';
+  const wall = ['#f3e2c6', '#d6ebe6', '#f4d6cb', '#e0e6f2', '#efe2b6'][i % 5], accent = TILE[i % TILE.length], slab = '#fbfaf6', steel = '#5b6266';
   k.box(W + 0.4, b0, D + 0.4, '#c9c4b8', 0, b0/2, 0);
   k.box(W, F*fh, D, wall, 0, b0 + F*fh/2, 0);
   k.box(1.25, F*fh, 0.06, '#b9875a', W/2 - 0.62, b0 + F*fh/2, D/2 + 0.03);
@@ -153,15 +157,21 @@ function modernKit(i, F = i % 3 === 1 ? 3 : 2){
     for(const sx of [-1, 1]){ k.glass(0.04, 0.75, 0.98, -0.25 + sx*(W/2 - 0.25), y + 0.45, D/2 + 0.5); k.box(0.05, 0.05, 1.0, steel, -0.25 + sx*(W/2 - 0.25), y + 0.84, D/2 + 0.5); }
     k.win(1.6, 1.4, 0.08, -1.15, y + 0.85, D/2 + 0.02); k.box(0.06, 1.4, 0.11, steel, -1.15, y + 0.85, D/2 + 0.05);
     k.win(0.9, 1.4, 0.08, 0.55, y + 0.85, D/2 + 0.02);
-    k.win(0.08, 1.0, 1.5, W/2 + 0.01, y + 0.95, -0.3); k.win(0.08, 1.0, 1.5, -W/2 - 0.01, y + 0.95, -0.3);
+    for(const sx of [-1, 1]) for(const z of [-1.0, 0.75]) win1(k, sx*(W/2 + 0.01), y + 0.95, z, sx*Math.PI/2, slab, null, { w: 0.8, h: 1.05 });
+    for(const x of [-1.2, 1.2]) win1(k, x, y + 0.95, -D/2 - 0.01, Math.PI, slab, null, { w: 0.9, h: 1.05 });
     k.cyl(0.18, 0.14, 0.3, 6, '#c8734a', -W/2 + 0.65, y + 0.21, D/2 + 0.68); k.ball(0.3, '#4f9a3c', -W/2 + 0.65, y + 0.56, D/2 + 0.68, 1);
     if(f === 1 || i % 2){ k.box(0.45, 0.05, 0.45, '#ffffff', 0.9, y + 0.45, D/2 + 0.5); k.box(0.45, 0.4, 0.05, '#ffffff', 0.9, y + 0.65, D/2 + 0.3); }
   }
-  k.win(0.08, 1.0, 1.5, W/2 + 0.01, b0 + 1.0, -0.4);
+  for(const sx of [-1, 1]) win1(k, sx*(W/2 + 0.01), b0 + 1.0, -0.6, sx*Math.PI/2, slab, null, { w: 1.1, h: 1.0 });
+  // a painted band at every floor and a coloured cap on the parapet, so the sides read as storeys, not a blank box
+  for(let f=1; f<F; f++) for(const sx of [-1, 1]) k.box(0.05, 0.16, D + 0.02, shade(wall, 0.82), sx*(W/2 + 0.03), b0 + f*fh + 0.1, 0);
+  k.box(W + 0.02, 0.16, 0.05, shade(wall, 0.82), 0, b0 + fh + 0.1, -D/2 - 0.03);
+  k.box(W + 0.04, b0 + 0.12, D + 0.04, shade(wall, 0.78), 0, (b0 + 0.12)/2, 0);
   // roof: parapet, solar panels, a heat-pump, sometimes a terrace umbrella
   const top = b0 + F*fh;
   k.box(W + 0.25, 0.14, D + 0.25, slab, 0, top, 0);
-  for(const s of [-1, 1]){ k.box(W + 0.25, 0.42, 0.12, slab, 0, top + 0.2, s*(D/2 + 0.06)); k.box(0.12, 0.42, D + 0.25, slab, s*(W/2 + 0.06), top + 0.2, 0); }
+  for(const s of [-1, 1]){ k.box(W + 0.25, 0.42, 0.12, slab, 0, top + 0.2, s*(D/2 + 0.06)); k.box(0.12, 0.42, D + 0.25, slab, s*(W/2 + 0.06), top + 0.2, 0);
+    k.box(W + 0.31, 0.08, 0.18, accent, 0, top + 0.44, s*(D/2 + 0.06)); k.box(0.18, 0.08, D + 0.31, accent, s*(W/2 + 0.06), top + 0.44, 0); }
   for(let j=0;j<3;j++){ k.box(1.1, 0.06, 0.85, '#24406b', -1.35 + j*1.2, top + 0.42, -0.95, 0, -0.38);
     k.box(1.12, 0.07, 0.03, '#cfd6dc', -1.35 + j*1.2, top + 0.43, -0.95, 0, -0.38); k.box(0.03, 0.07, 0.86, '#cfd6dc', -1.35 + j*1.2, top + 0.43, -0.95, 0, -0.38); }
   k.box(0.75, 0.5, 0.5, '#d9dcde', 1.55, top + 0.32, 0.6); k.cyl(0.17, 0.17, 0.03, 10, '#5b6266', 1.55, top + 0.33, 0.86, 0, Math.PI/2);
@@ -192,7 +202,14 @@ function shopKit(t, j, lv = 1){
     for(let q=0;q<2;q++){ k.box(0.42, 0.95, 0.05, '#222831', 1.75, 1.25, -0.4 + q*0.6, Math.PI/2); k.box(0.42, 0.06, 0.06, '#7a5a3c', 1.75, 1.75, -0.4 + q*0.6, Math.PI/2); }
   } else {
     k.box(4.2, 0.25, 3.5, '#c9c4b8', 0, 0.12, 0);
-    k.box(3.9, 2.7, 3.2, '#f6f6f2', 0, 1.6, 0);
+    k.box(3.9, 2.7, 3.2, '#e4f3f1', 0, 1.6, 0);
+    // timber cladding on the sides, side windows, a roof deck with a rail and a dive flag
+    for(const sx of [-1, 1]){ k.box(0.05, 2.7, 3.22, '#b9875a', sx*1.96, 1.6, 0); for(let q=0;q<9;q++) k.box(0.08, 2.7, 0.04, '#8f6440', sx*1.97, 1.6, -1.5 + q*0.375);
+      win1(k, sx*1.99, 1.7, -0.4, sx*Math.PI/2, '#ffffff', null, { w: 1.2, h: 0.9 }); }
+    win1(k, -0.9, 1.7, -1.61, Math.PI, '#ffffff', null, { w: 1.1, h: 0.9 }); win1(k, 0.9, 1.7, -1.61, Math.PI, '#ffffff', null, { w: 1.1, h: 0.9 });
+    for(const sz of [-1, 1]) k.box(4.6, 0.05, 0.06, '#5b6266', 0, 3.75, 0.35 + sz*2.1); for(const sx of [-1, 1]) k.box(0.06, 0.05, 4.2, '#5b6266', sx*2.3, 3.75, 0.35);
+    for(let q=0;q<8;q++) for(const sz of [-1, 1]) k.box(0.04, 0.6, 0.04, '#5b6266', -2.25 + q*0.64, 3.45, 0.35 + sz*2.1);
+    k.cyl(0.03, 0.03, 2.0, 4, '#5b6266', 1.9, 4.1, -1.4); k.box(0.03, 0.5, 0.75, '#d83a3a', 1.9, 4.8, -1.0); k.box(0.035, 0.09, 0.8, '#ffffff', 1.9, 4.8, -1.0, 0, 0.55);
     k.win(3.0, 1.95, 0.05, -0.25, 1.3, 1.58); k.glass(3.05, 2.0, 0.04, -0.25, 1.3, 1.63);
     for(let q=0;q<4;q++) k.box(0.07, 2.0, 0.1, '#4d5559', -1.75 + q*1.0, 1.3, 1.64);
     k.box(4.7, 0.18, 4.3, '#ffffff', 0, 3.05, 0.35);
@@ -448,9 +465,53 @@ const annexRoof = (k, W, D, x, y, z, roof) => { k.box(W + 0.5, 0.18, D + 0.5, ro
   k.box(0.5, 2.2, 0.2, '#4d5559', -5.6, 4.2, 0.4, 0, 0.6); k.glass(4.2, 1.6, 0.05, -5.6, 1.6, 2.62);
   upgPiece(k, x, z, 0, () => lvAt('school', 0) >= 3); }
 // resorts: the first one's wing and eco-roof; a second resort on the hill
+// the resort: three storeys of rooms with balconies, a set-back penthouse floor, a lobby canopy and a pool deck in front
+// (massing kept as before, so the wing and eco-roof upgrades still sit where they should)
+function resortKit(){
+  const k = new Kit(), wall = '#f5efe4', acc = '#d9825b', teal = '#3aa6a8', slab = '#fbfaf6', steel = '#5b6266', fh = 2.17, W = 16, D = 7;
+  k.box(W + 0.6, 0.3, D + 0.6, '#c9c4b8', 0, 0.15, 0);
+  k.box(W, 3*fh, D, wall, 0, 0.3 + 1.5*fh, 0);
+  // ground floor: lobby glass in the middle, a canopy on two posts
+  k.win(5.0, 1.7, 0.08, 0, 1.25, D/2 + 0.02); for(let j=0;j<6;j++) k.box(0.07, 1.75, 0.12, steel, -2.5 + j, 1.25, D/2 + 0.05);
+  k.box(6.2, 0.16, 2.4, slab, 0, 2.35, D/2 + 1.15); k.box(6.3, 0.1, 0.12, teal, 0, 2.47, D/2 + 2.33); for(const sx of [-1, 1]) k.cyl(0.08, 0.08, 2.1, 6, steel, sx*2.8, 1.3, D/2 + 2.1);
+  for(const sx of [-1, 1]) for(let r=0;r<2;r++) win1(k, sx*(4.6 + r*2.3), 1.35, D/2 + 0.02, 0, slab, null, { w: 1.3, h: 1.1 });
+  // rooms: each bay a pastel pilaster, a window-door and a balcony with a glass rail
+  for(let f=1; f<3; f++){ const y = 0.3 + f*fh;
+    k.box(W + 0.3, 0.16, D + 0.3, slab, 0, y, 0);
+    for(let b=0;b<6;b++){ const x = -W/2 + 1.33 + b*2.67;
+      k.win(1.5, 1.55, 0.08, x, y + 0.95, D/2 + 0.02);
+      k.box(2.2, 0.12, 1.0, slab, x, y + 0.06, D/2 + 0.5);
+      k.glass(2.2, 0.7, 0.04, x, y + 0.45, D/2 + 0.98); k.box(2.2, 0.05, 0.08, steel, x, y + 0.82, D/2 + 0.98);
+      if((b + f) % 3 === 0){ k.box(0.4, 0.05, 0.4, '#ffffff', x - 0.5, y + 0.42, D/2 + 0.55); k.cyl(0.18, 0.14, 0.3, 6, '#c8734a', x + 0.75, y + 0.27, D/2 + 0.7); k.ball(0.28, '#4f9a3c', x + 0.75, y + 0.6, D/2 + 0.7, 1); } }
+    for(let b=0;b<=6;b++) k.box(0.32, fh - 0.16, 0.12, b % 2 ? acc : teal, -W/2 + b*2.67, y + fh/2, D/2 + 0.05); }
+  // sides and back: rows of windows and a band at each floor
+  for(let f=0; f<3; f++){ const y = 0.3 + f*fh + 1.05;
+    for(const sx of [-1, 1]) for(const z of [-2.0, 0, 2.0]) win1(k, sx*(W/2 + 0.01), y, z, sx*Math.PI/2, slab, null, { w: 0.9, h: 1.0 });
+    for(let b=0;b<6;b++) win1(k, -W/2 + 1.33 + b*2.67, y, -D/2 - 0.01, Math.PI, slab, null, { w: 1.0, h: 1.0 });
+    if(f) for(const sx of [-1, 1]) k.box(0.05, 0.16, D + 0.02, shade(wall, 0.84), sx*(W/2 + 0.03), 0.3 + f*fh + 0.1, 0); }
+  // roof of the main block: parapet with a terracotta cap, a pergola on the front terrace
+  const top = 0.3 + 3*fh;
+  k.box(W + 0.3, 0.16, D + 0.3, slab, 0, top, 0);
+  for(const s of [-1, 1]){ k.box(W + 0.3, 0.5, 0.12, slab, 0, top + 0.25, s*(D/2 + 0.09)); k.box(0.12, 0.5, D + 0.3, slab, s*(W/2 + 0.09), top + 0.25, 0);
+    k.box(W + 0.36, 0.08, 0.2, acc, 0, top + 0.52, s*(D/2 + 0.09)); k.box(0.2, 0.08, D + 0.36, acc, s*(W/2 + 0.09), top + 0.52, 0); }
+  for(let j=0;j<5;j++) k.box(0.1, 0.1, 2.4, '#8f6440', 4.0 + j*0.8, top + 2.2, 1.9); for(const px of [4.0, 7.2]) for(const pz of [0.9, 3.0]) k.box(0.12, 2.1, 0.12, '#8f6440', px, top + 1.1, pz);
+  // penthouse floor, set back, with a long window band and its own cap
+  k.box(10, 3.4, 6, wall, -2, top + 1.7, -0.3);
+  k.win(9.2, 1.6, 0.08, -2, top + 1.6, 2.72); for(let j=0;j<7;j++) k.box(0.07, 1.65, 0.12, steel, -6.6 + j*1.53, top + 1.6, 2.75);
+  for(const sx of [-1, 1]) win1(k, -2 + sx*5.01, top + 1.6, -0.3, sx*Math.PI/2, slab, null, { w: 1.6, h: 1.2 });
+  k.box(10.4, 0.2, 6.4, slab, -2, top + 3.45, -0.3); k.box(10.5, 0.1, 6.5, teal, -2, top + 3.6, -0.3);
+  // pool deck in front: white deck, blue pool with a lighter rim, loungers and umbrellas, palms in planters
+  k.box(9, 0.22, 4.6, '#efe9dc', 2, 0.11, 6.6); k.box(7, 0.08, 3.4, '#4fcfe0', 2, 0.24, 6.6); k.box(7.2, 0.1, 0.12, '#ffffff', 2, 0.26, 4.85); k.box(7.2, 0.1, 0.12, '#ffffff', 2, 0.26, 8.35);
+  for(let j=0;j<4;j++){ const lx = -1.6 + j*1.25; k.box(0.55, 0.12, 1.4, '#ffffff', lx, 0.42, 9.4, 0); k.box(0.55, 0.5, 0.1, '#ffffff', lx, 0.62, 10.05, 0, -0.5); }
+  for(const [px, c] of [[-3, '#ff7a59'], [-1, '#ffd166'], [6.4, '#4fc3d9']]){ k.cyl(0.05, 0.05, 2.2, 4, '#555555', px, 1.1, 6.6); k.geo(new THREE.ConeGeometry(1.1, 0.5, 8), c, px, 2.3, 6.6); k.geo(new THREE.ConeGeometry(1.12, 0.12, 8), '#ffffff', px, 2.08, 6.6); }
+  for(const px of [-5.6, 5.6]){ k.box(1.0, 0.6, 1.0, '#c9c4b8', px, 0.3, D/2 + 2.6); k.ball(0.55, '#4f9a3c', px, 0.95, D/2 + 2.6, 1); }
+  return k;
+}
+{ const old = VB.resort; if(old){ dio.remove(old); const g = resortKit().build(-31, -34, 0); VB.resort = hideG(g); } }
 VB.resort2 = hideG(VB.resort.clone()); VB.resort2.position.set(30, dioH(30, -52), -52); VB.resort2.rotation.y = -0.15; dio.add(VB.resort2);
 for(const [ri, x, z, ry] of [[0, -31, -34, 0], [1, 30, -52, -0.15]]){
-  let k = new Kit(); k.box(7, 5, 6, '#f6f2ea', -11.5, 2.5, 0.5); for(const y of [1.2, 3.4]) k.win(6.6, 0.9, 6.1, -11.5, y, 0.5);
+  let k = new Kit(); k.box(7, 5, 6, '#f5efe4', -11.5, 2.5, 0.5); for(const y of [1.2, 3.4]) k.win(6.6, 0.9, 6.1, -11.5, y, 0.5);
+  for(let b=0;b<=3;b++) k.box(0.3, 4.6, 0.12, b % 2 ? '#d9825b' : '#3aa6a8', -14.8 + b*2.2, 2.6, 3.55); k.box(7.3, 0.1, 6.3, '#3aa6a8', -11.5, 5.18, 0.5);
   k.box(7.4, 0.25, 6.4, '#9fb0b8', -11.5, 5.0, 0.5); k.box(4.5, 0.25, 3, '#5fd6e4', -11.5, 0.15, 5.6);
   upgPiece(k, x, z, ry, () => lvAt('resort', ri) >= 2);
   k = new Kit(); for(let i=0;i<10;i++) k.ball(0.6, i % 2 ? '#5f9a3c' : '#76b04a', -4 + (i % 5)*1.6 - 2, 10.4, -1.5 + Math.floor(i/5)*2.4, 1);

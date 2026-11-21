@@ -29,6 +29,12 @@ sunL.position.set(-70, 130, 80); sunL.castShadow = true; sunL.shadow.mapSize.set
 Object.assign(sunL.shadow.camera, { left: -130, right: 130, top: 130, bottom: -130, near: 10, far: 520 });
 sunL.shadow.bias = -0.0004; sunL.shadow.normalBias = 0.5; dio.add(sunL); sunL.target.position.set(0, 0, 10); dio.add(sunL.target);
 
+// a soft dark pool on the ground under a building or tree, so it sits on the earth instead of floating
+const contactTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 4, 32, 32, 32);
+  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const contactMat = new THREE.MeshBasicMaterial({ map: contactTex, color: '#1c2a18', transparent: true, opacity: 0.42, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const contactGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI/2);
+function contactShadow(sx, sz, cx = 0, cz = 0, y = 0.04){ const m = new THREE.Mesh(contactGeo, contactMat); m.scale.set(sx*1.35, 1, sz*1.35); m.position.set(cx, y, cz); m.renderOrder = 1; return m; }
 const SM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, flatShading: true, ...o });
 function dm(geo, mat, x = 0, y = 0, z = 0, parent = dio){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; }
 const DREEF = [[-20, 32, 7, 3.6], [5, 38, 8, 4.4], [24, 29, 6, 3.2], [-3, 24, 5, 2.6], [-32, 43, 6, 3.0], [31, 44, 5, 2.8], [16, 46, 4, 2.4]];
@@ -57,7 +63,7 @@ function pathDist(x, z){ let d = 1e9;
   return d; }
 function dioColor(h, x, z, out){
   const n = fbm(x*0.08 + 11, z*0.08 - 4);
-  if(h > 1.25){ out.set('#6fa443').lerp(new THREE.Color('#8dbb55'), n); const pd = pathDist(x, z); if(pd < 1.6) out.lerp(new THREE.Color('#d8c49a'), smooth(1.6, 0.8, pd)); }
+  if(h > 1.25){ out.set('#5a8c36').lerp(new THREE.Color('#78a347'), n); out.lerp(new THREE.Color('#8e9a4c'), smooth(0.5, 0.72, fbm(x*0.022 - 7, z*0.022 + 5))*0.45); const pd = pathDist(x, z); if(pd < 1.6) out.lerp(new THREE.Color('#d8c49a'), smooth(1.6, 0.8, pd)); }
   else if(h > -0.9) out.set(h > 0.15 ? '#ecdcae' : '#d6c08e');
   else { out.set('#dccb9e').lerp(new THREE.Color('#9fb0a2'), smooth(-2, -12, h)); if(h > -9 && z > 14) out.lerp(new THREE.Color('#a89a86'), 0.5); }
   return out;
@@ -236,6 +242,14 @@ const dNets = [0, 2, 1, 4].map(k => { const R = DREEF[k], g = new THREE.PlaneGeo
 const VB = {};
 const winMat = new THREE.MeshStandardMaterial({ color: '#2f4a5c', roughness: 0.25, flatShading: true, emissive: new THREE.Color('#ffc46b'), emissiveIntensity: 0 });
 const lampMat = new THREE.MeshStandardMaterial({ color: '#fff3d0', emissive: new THREE.Color('#ffd27a'), emissiveIntensity: 0 });
+// the sky, baked once into an environment map: windows and glass mirror it, walls and roofs pick up a little of its colour
+const skyEnv = (() => { const sc = new THREE.Scene();
+  sc.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide,
+    vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vP; void main(){ float y = vP.y; vec3 c = mix(vec3(0.42, 0.45, 0.38), vec3(0.85, 0.92, 0.95), smoothstep(-0.2, 0.05, y)); c = mix(c, vec3(0.45, 0.68, 0.9), smoothstep(0.1, 0.8, y));
+      c += vec3(1.6, 1.5, 1.3) * pow(max(dot(vP, normalize(vec3(-0.45, 0.8, 0.4))), 0.0), 64.0); gl_FragColor = vec4(c, 1.0); }` })));
+  const pm = new THREE.PMREMGenerator(renderer), t = pm.fromScene(sc, 0.02).texture; pm.dispose(); return t; })();
+winMat.envMap = skyEnv; winMat.envMapIntensity = 1.2; winMat.metalness = 0.3;
 const canopyMats = [], SWAY = [];
 // a subtropical island: fresh green in spring, deep green in summer, some broadleaf trees turn amber in autumn,
 // and the dry winter goes olive with khaki grass. Palms stay green all year.
@@ -282,6 +296,7 @@ function blob(r, detail = 1){
 }
 function tree(x, z, s){
   const g = new THREE.Group(); g.position.set(x, dioH(x, z), z); g.scale.setScalar(s); g.rotation.y = rng()*6; dio.add(g); SWAY.push({ g, ph: Math.random()*6, k: 1 });
+  g.add(contactShadow(3.6, 3.6, 0, 0, 0.05));
   const bark = SM('#6f4e33');
   dm(new THREE.CylinderGeometry(0.26, 0.45, 4.2, 7), bark, 0, 2.1, 0, g);
   dm(new THREE.CylinderGeometry(0.1, 0.18, 2, 5), bark, 0.6, 3.6, 0, g).rotation.z = -0.8;
@@ -346,6 +361,13 @@ function makeBoat(color, kind){
     dm(new THREE.BoxGeometry(W*0.72, 0.1, cabL*1.2), SM(big ? '#b8452f' : color), 0, 0.65 + cabH, cz, g);
     if(!big){ dm(new THREE.CylinderGeometry(0.04, 0.05, 2.2, 5), SM('#6b5034'), 0, 1.7, L*0.18, g);
       dm(new THREE.BoxGeometry(0.03, 0.32, 0.5), SM('#ffd166'), 0, 2.6, L*0.18 - 0.28, g); }
+    // working clutter: a white stripe along the hull, a life ring on the cabin, fish crates and a pile of net on the deck, a buoy on the bow
+    dm(hullGeo(L*1.012, W*1.05, Hh*0.05), SM('#f4f1ea'), 0, 0.15 + Hh*0.18, 0, g);
+    dm(new THREE.TorusGeometry(0.17, 0.05, 5, 10), SM('#ff6a3d'), W*0.31, 0.6 + cabH*0.45, cz, g).rotation.y = Math.PI/2;
+    const deckY = 0.15 + Hh*0.42 + 0.04, sz = big ? -L*0.3 : L*0.1;
+    for(let q=0;q<(big ? 4 : 2);q++) dm(new THREE.BoxGeometry(0.42, 0.24, 0.32), SM(q % 2 ? '#3a7bd5' : '#e8a33a'), (q % 2 - 0.5)*0.48, deckY + 0.12 + Math.floor(q/2)*0.24, sz - 0.5, g);
+    dm(new THREE.IcosahedronGeometry(0.34, 1).scale(1.2, 0.45, 1), SM('#3f6b5a'), 0.05, deckY + 0.1, sz + (big ? 0.6 : 0.35), g);
+    dm(new THREE.SphereGeometry(0.13, 8, 6), SM('#ff6a3d'), W*0.25, deckY + 0.15, L*0.36, g);
   }
   if(big){
     const steel = SM('#2e2e2e');
@@ -430,7 +452,7 @@ function makeBoat(color, kind){
     for(let i=0;i<5;i++){ const b = blade.clone(); b.rotateZ((rng() - 0.5)*0.7); b.rotateY(i*1.3); b.translate((rng() - 0.5)*0.35, 0, (rng() - 0.5)*0.35); b.scale(1, 0.7 + rng()*0.6, 1); tuftParts.push(b); }
     // lit like the ground (normals straight up) and coloured like the grass, a touch lighter, so tufts read as texture, not stubble
     const tg = mergeGeometries(tuftParts), tn = tg.attributes.normal; for(let i=0;i<tn.count;i++) tn.setXYZ(i, 0, 1, 0);
-    const tuftMat = dio.userData.tuftMat = new THREE.MeshStandardMaterial({ color: '#8cc458', roughness: 0.95 }); tuftMat.userData.base = tuftMat.color.clone();
+    const tuftMat = dio.userData.tuftMat = new THREE.MeshStandardMaterial({ color: '#7aab4a', roughness: 0.95 }); tuftMat.userData.base = tuftMat.color.clone();
     const tufts = new THREE.InstancedMesh(tg, tuftMat, 1700), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
     let n = 0; for(const [x, h, z] of spots.slice(0, 1700)){ Q.setFromAxisAngle(Y, rng()*6.28); S.setScalar(0.5 + rng()*0.5); M.compose(P.set(x, h - 0.05, z), Q, S); tufts.setMatrixAt(n++, M); }
     tufts.count = n; tufts.receiveShadow = true; dio.add(tufts);

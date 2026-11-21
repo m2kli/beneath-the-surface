@@ -105,3 +105,18 @@ One entry per round. Each entry says what was looked at, what was found, what ch
 - **Village, first pass.** Canopies have baked light (darker underneath, lighter on top), so trees read as rounded masses. The lawns have grass tufts, wildflowers and pebbles. Village frame ~12 ms.
 - **Found and fixed:** the marine-snow shader used `uNight` without declaring it, so since round 4 it never compiled: no marine snow, no night plankton. It renders again.
 - **Still open:** houses, docks and the bigger town tiers could use a proper modelling pass.
+
+## Round 9: modelling pass on the village and town
+
+- **What made it look cheap:** the models were reasonably detailed. But everything was lit flat, buildings floated on the grass, the grass was one neon green, and from the default camera you mostly see the bare side walls of the bigger buildings.
+- **Whole village:**
+  - building parts get baked light (darker toward the ground, a slight tone per part);
+  - every building and tree has a soft contact shadow under it;
+  - windows and glass reflect a baked sky, and walls pick up a little of its colour (all fading out at night);
+  - the grass is a deeper green with large warm patches.
+- **Guesthouses (tier 2–3):** pastel plaster, framed window pairs on both sides and on the back, a band at every floor, a coloured cap on the parapet.
+- **Resort:** rebuilt. Three storeys of rooms with balconies and alternating teal/terracotta pilasters, a set-back penthouse floor, a lobby canopy, a roof pergola, and a pool deck with loungers, umbrellas and planters. The upgrade wing matches it.
+- **Dive shop (tier 2):** timber-clad sides, side and back windows, a railed roof deck with a dive flag.
+- **Fishing boats:** a white hull stripe, a life ring on the cabin, fish crates and a pile of net on deck, a buoy on the bow.
+- **Checked:** close-ups at tiers 0, 1 and 3, the mid and default views, and night and dusk. No errors. A full tier-3 town runs at ~14 ms per frame.
+- **Not changed:** stilt huts and tiled cottages (already the most detailed), roads, the harbour quay.
