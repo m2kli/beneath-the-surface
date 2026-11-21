@@ -369,7 +369,7 @@ const ANEMONE_SPOTS = [];
   const pts = new THREE.Points(g, mat({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: /* glsl */`
-    attribute float aSize; uniform float uTime; varying float vA; varying float vBokeh; varying float vY; varying float vG;
+    attribute float aSize; uniform float uTime; uniform float uNight; varying float vA; varying float vBokeh; varying float vY; varying float vG;
     void main(){
       vec3 p = position + vec3(sin(uTime*0.15 + position.y)*1.5, -uTime*0.22*aSize, cos(uTime*0.12 + position.x)*1.5);
       p = mod(p - cameraPosition + 40.0, 80.0) - 40.0 + cameraPosition;

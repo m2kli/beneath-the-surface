@@ -65,9 +65,21 @@ function dioColor(h, x, z, out){
 {
   // top surface
   const g = new THREE.PlaneGeometry(100, 90 + 140, 120, 260).rotateX(-Math.PI/2).translate(0, 0, (140 - 90)/2), p = g.attributes.position, col = new Float32Array(p.count*3), c = new THREE.Color();
-  for(let i=0;i<p.count;i++){ const x = p.getX(i), z = p.getZ(i), h = dioH(x, z); p.setY(i, h); dioColor(h, x, z, c); col.set([c.r, c.g, c.b], i*3); }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
-  dm(g, dio.userData.groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  const grass = new Float32Array(p.count);
+  for(let i=0;i<p.count;i++){ const x = p.getX(i), z = p.getZ(i), h = dioH(x, z); p.setY(i, h); dioColor(h, x, z, c); col.set([c.r, c.g, c.b], i*3);
+    grass[i] = smooth(1.0, 1.6, h) * smooth(0.9, 1.7, pathDist(x, z)); }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aGrass', new THREE.BufferAttribute(grass, 1)); g.computeVertexNormals();
+  // the grass takes the season's tint (paths and sand don't), so the ground always matches the trees
+  const gm = dio.userData.groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  gm.customProgramCacheKey = () => 'grassTint';
+  gm.onBeforeCompile = sh => { sh.uniforms.uGrassTint = grassTint;
+    sh.vertexShader = `attribute float aGrass; varying float vGrass;
+` + sh.vertexShader.replace('#include <color_vertex>', `#include <color_vertex>
+ vGrass = aGrass;`);
+    sh.fragmentShader = `uniform vec3 uGrassTint; varying float vGrass;
+` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+ diffuseColor.rgb *= mix(vec3(1.0), uGrassTint, vGrass);`); };
+  dm(g, gm);
   // cut-away walls with soil layers
   const pos = [], cols = [], N = 120;
   const sides = [t => [-50 + t*100, 140], t => [50, 140 - t*230], t => [50 - t*100, -90], t => [-50, -90 + t*230]];
@@ -225,7 +237,12 @@ const VB = {};
 const winMat = new THREE.MeshStandardMaterial({ color: '#2f4a5c', roughness: 0.25, flatShading: true, emissive: new THREE.Color('#ffc46b'), emissiveIntensity: 0 });
 const lampMat = new THREE.MeshStandardMaterial({ color: '#fff3d0', emissive: new THREE.Color('#ffd27a'), emissiveIntensity: 0 });
 const canopyMats = [], SWAY = [];
-const SEASON_COL = ['#8cc95a', '#5d9a3a', '#d9893a', '#a3ad8c'].map(h => new THREE.Color(h));
+// a subtropical island: fresh green in spring, deep green in summer, some broadleaf trees turn amber in autumn,
+// and the dry winter goes olive with khaki grass. Palms stay green all year.
+const SEASON_COL = ['#8cc95a', '#5d9a3a', '#7f9a3a', '#6f8a42'].map(h => new THREE.Color(h));
+const SEASON_ALT = ['#9ad064', '#4f8d34', '#c9843a', '#8a8a48'].map(h => new THREE.Color(h)); // the other half of the trees
+const GRASS_TINT = [[1.0, 1.06, 0.9], [0.84, 0.96, 0.8], [1.22, 1.02, 0.58], [1.3, 1.02, 0.56]].map(a => new THREE.Vector3(...a));
+const grassTint = { value: GRASS_TINT[0].clone() };
 function prism(r, len){ return new THREE.CylinderGeometry(r, r, len, 3).rotateZ(Math.PI/2).rotateX(-Math.PI/2); }
 function merged(parts, mat, parent = dio){
   const m = new THREE.Mesh(mergeGeometries(parts.map(g => g.index ? g.toNonIndexed() : g)), mat);
@@ -291,7 +308,7 @@ function palm(x, z, s){
       const off = new THREE.Vector3(0, py, pz).applyAxisAngle(new THREE.Vector3(0, 1, 0), k/9*Math.PI*2);
       M4.compose(off.add(top), q, new THREE.Vector3(1, 1, 1)); sg.applyMatrix4(M4); leaf.push(sg);
       pz += Math.cos(th)*0.45; py += Math.sin(th)*0.45; } }
-  const lm = SM('#3f8a34'); lm.userData.v = 0.5; canopyMats.push(lm);
+  const lm = SM('#3f8a34');
   merged(leaf, lm, g);
   for(let k=0;k<3;k++) dm(new THREE.SphereGeometry(0.22, 8, 6), SM('#6a4a26'), top.x + Math.cos(k*2.1)*0.3, top.y - 0.25, Math.sin(k*2.1)*0.3, g);
   return g;

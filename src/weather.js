@@ -191,8 +191,9 @@ function updateDiorama(dt){
   dioNight = nightW; portalU.uDay.value = dayW + duskW*0.7;
   applyWeather(dt, t, running, dayW, duskW, nightW);
   // --- the season colours the trees
-  const sc = SEASON_COL[V.season % 4];
-  for(const m of canopyMats){ tmpCol.copy(sc).offsetHSL((m.userData.v - 0.5)*0.04, 0, (m.userData.v - 0.5)*0.1); m.color.lerp(tmpCol, Math.min(1, dt*(running ? 0.8 : 3))); }
+  const si = V.season % 4, sk = Math.min(1, dt*(running ? 0.8 : 3));
+  for(const m of canopyMats){ const alt = m.userData.v < (si === 2 ? 0.45 : 0.3); tmpCol.copy(alt ? SEASON_ALT[si] : SEASON_COL[si]).offsetHSL((m.userData.v - 0.5)*0.04, 0, (m.userData.v - 0.5)*0.08); m.color.lerp(tmpCol, sk); }
+  grassTint.value.lerp(GRASS_TINT[si], sk);
   // --- clouds race across during the time-lapse
   for(const c of clouds){ c.g.position.x += dt*(running ? 34 : 1.2 + wx.wind*5)*c.sp; if(c.g.position.x > 120) c.g.position.x = -120; }
   controls.autoRotate = (running || state === 'intro') && !zoom; controls.autoRotateSpeed = state === 'intro' ? 0.6 : 1.4;
