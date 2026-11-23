@@ -4,7 +4,7 @@ A fishing village on a floating cut-away island, and the reef it lives on. You r
 
 > **Status: in development (v0.1.0-dev).** Balance, content and visuals are still changing, and saves from an older version may not load.
 
-**在线试玩 / Play:** _(add the GitHub Pages link here after the first deploy)_
+**在线试玩 / Play:** https://m2kli.github.io/beneath-the-surface/
 
 Runs in a desktop browser with WebGL 2 (recent Chrome, Edge or Firefox). Publishing steps are in `DEPLOY.md`.
 
