@@ -136,3 +136,13 @@ One entry per round. Each entry says what was looked at, what was found, what ch
   - fins are lighter than the body, with fine rays, and there's a gill line behind the eye;
   - silver fish (barracuda, tuna, sardines) reflect less, so they no longer blow out to white.
 - **Checked:** close-ups of each, underwater shots of five species. No errors; tier-3 town ~12 ms, dive ~14 ms per frame.
+
+## Round 11: quieter, softer sound (v0.1.1-dev)
+
+- **Found:** the bed was a brown-noise roar low-passed at 420 Hz at high gain, plus five sine drones from 98 Hz up. That's the constant "rumbling" the user disliked.
+- **Changed:**
+  - the roar is gone; soft surf now swells and draws back every 8–12 s, mid and high frequencies only (high-passed at 320 Hz), muffled and quieter underwater;
+  - the drones are replaced by a slow pentatonic pad (three soft voices, chords change every ~9 s) and an occasional quiet bell;
+  - master 0.55 → 0.4; event chimes softened to match.
+- **Measured** (signal read before the master, page muted): about 18 dB quieter overall, energy below 150 Hz down 46 dB (was 45% of the old bed, now ~0%).
+- **Needs a human ear:** whether the new mix is pleasant and the levels feel right.

@@ -278,7 +278,8 @@ function oceanLook(dt, fromShore){
   volMat.uniforms.uVolGain.value = lerp(0.3, 1.25, e);
   bloom.strength = lerp(0.3, 0.5, e) + night*0.25;
   if(spawnU.uSpawn.value > 0) spawnU.uSpawn.value += dt;
-  if(padGain) padGain.gain.value = 0.15 + e*0.85;
+  if(padGain) padGain.gain.value = 0.35 + e*0.65; // a sick sea sounds thinner
+  setAudioScene(!fromShore);
   pulseT += dt; U.uPulse.value.w = pulseT*30; U.uPulseFade.value = Math.max(0, 1 - pulseT/3.6);
 }
 // ---- everything alive down there, whether or not you are

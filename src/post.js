@@ -145,31 +145,64 @@ let userMuted = params.get('mute') === '1';
 function applyMute(){
   if(!AC || !master) return;
   const on = !userMuted && document.visibilityState === 'visible' && document.hasFocus();
-  master.gain.setTargetAtTime(on ? 0.55 : 0, AC.currentTime, 0.15);
+  master.gain.setTargetAtTime(on ? 0.4 : 0, AC.currentTime, 0.15);
 }
 document.addEventListener('visibilitychange', applyMute);
 addEventListener('blur', applyMute); addEventListener('focus', applyMute);
 addEventListener('keydown', e => { if(e.code === 'KeyM'){ userMuted = !userMuted; applyMute(); } });
+// the bed: soft surf that swells and draws back (mid and high frequencies only, no rumble), and a slow, quiet
+// pentatonic pad with now and then a bell note. Underwater the surf is muffled and the pad sits closer.
+let surfLP = null, surfG = null, audioUnder = null;
 function initAudio(){
   try{
     AC = new (window.AudioContext || window.webkitAudioContext)();
     master = AC.createGain(); master.gain.value = 0; master.connect(AC.destination); applyMute();
-    const buf = AC.createBuffer(1, AC.sampleRate*4, AC.sampleRate), d = buf.getChannelData(0); let last = 0;
-    for(let i=0;i<d.length;i++){ const w = Math.random()*2 - 1; last = (last + 0.02*w)/1.02; d[i] = last*3.2; }
+    // pink-ish noise for the surf
+    const buf = AC.createBuffer(1, AC.sampleRate*6, AC.sampleRate), d = buf.getChannelData(0); let b0 = 0, b1 = 0, b2 = 0;
+    for(let i=0;i<d.length;i++){ const w = Math.random()*2 - 1; b0 = 0.997*b0 + 0.029591*w; b1 = 0.985*b1 + 0.032534*w; b2 = 0.95*b2 + 0.048056*w; d[i] = (b0 + b1 + b2 + w*0.18)*0.9; }
     const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
-    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
-    const ng = AC.createGain(); ng.gain.value = 0.55; src.connect(lp).connect(ng).connect(master); src.start();
+    const hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; hp.Q.value = 0.5;
+    surfLP = AC.createBiquadFilter(); surfLP.type = 'lowpass'; surfLP.frequency.value = 2400; surfLP.Q.value = 0.4;
+    surfG = AC.createGain(); surfG.gain.value = 0.0;
+    src.connect(hp).connect(surfLP).connect(surfG).connect(master); src.start();
+    // each wave: rises over ~2.5 s, falls away over ~4 s, a pause, the next one (8–12 s apart)
+    const wave = () => { if(!AC) return; const t = AC.currentTime, peak = (audioUnder ? 0.025 : 0.06)*(0.7 + Math.random()*0.5), up = 2 + Math.random()*1.2, down = 3.5 + Math.random()*1.5;
+      surfG.gain.cancelScheduledValues(t); surfG.gain.setValueAtTime(surfG.gain.value, t);
+      surfG.gain.linearRampToValueAtTime(peak, t + up); surfG.gain.linearRampToValueAtTime(peak*0.18, t + up + down);
+      setTimeout(wave, (up + down + 1.5 + Math.random()*3)*1000); };
+    wave();
+    // the pad: three soft voices per chord, chords change every ~9 s, each voice fades in and out slowly
     padGain = AC.createGain(); padGain.gain.value = 0; padGain.connect(master);
-    [98, 146.83, 220, 293.66, 369.99].forEach((f, i) => { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.detune.value = (i%2 ? 6 : -6);
-      const g = AC.createGain(); g.gain.value = 0.05; const l = AC.createOscillator(); l.frequency.value = 0.07 + i*0.03; const lg = AC.createGain(); lg.gain.value = 0.03;
-      l.connect(lg).connect(g.gain); o.connect(g).connect(padGain); o.start(); l.start(); });
+    const CH = [[293.66, 369.99, 440], [246.94, 293.66, 369.99], [329.63, 440, 493.88], [220, 293.66, 369.99], [293.66, 440, 587.33]];
+    let ci = 0;
+    const chord = () => { if(!AC) return; const t = AC.currentTime, notes = CH[ci++ % CH.length], len = 10;
+      notes.forEach((f, n) => { const o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+        o.type = n ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = (Math.random() - 0.5)*8;
+        lp.type = 'lowpass'; lp.frequency.value = 1400;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.022, t + 3.5); g.gain.setValueAtTime(0.022, t + len - 3.5); g.gain.linearRampToValueAtTime(0, t + len + 1);
+        o.connect(lp).connect(g).connect(padGain); o.start(t); o.stop(t + len + 1.2); });
+      setTimeout(chord, 9000); };
+    chord();
+    // a bell now and then, high and quiet, from the same scale
+    const BELL = [587.33, 659.25, 739.99, 880, 987.77, 1174.66];
+    const bell = () => { if(!AC) return; const t = AC.currentTime, f = BELL[Math.floor(Math.random()*BELL.length)];
+      for(const [m, a] of [[1, 0.03], [2.76, 0.008]]){ const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine'; o.frequency.value = f*m;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0003, t + 3.2);
+        o.connect(g).connect(padGain); o.start(t); o.stop(t + 3.3); }
+      setTimeout(bell, 4000 + Math.random()*7000); };
+    setTimeout(bell, 3000);
   }catch(e){ AC = null; }
+}
+// shore or underwater: underwater the surf is muffled and quieter
+function setAudioScene(under){
+  if(!AC || !surfLP || under === audioUnder) return; audioUnder = under;
+  surfLP.frequency.setTargetAtTime(under ? 650 : 2400, AC.currentTime, 0.6);
 }
 function chime(step){
   if(!AC) return; const scale = [293.66, 369.99, 440, 587.33, 739.99, 880, 1174.66], t0 = AC.currentTime;
   [0, 2, 4].forEach((k, n) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine';
     o.frequency.value = scale[(step + k) % scale.length] * (step + k >= scale.length ? 2 : 1);
-    g.gain.setValueAtTime(0, t0 + n*0.13); g.gain.linearRampToValueAtTime(0.16, t0 + n*0.13 + 0.03); g.gain.exponentialRampToValueAtTime(0.0005, t0 + n*0.13 + 2.6);
+    g.gain.setValueAtTime(0, t0 + n*0.13); g.gain.linearRampToValueAtTime(0.1, t0 + n*0.13 + 0.03); g.gain.exponentialRampToValueAtTime(0.0005, t0 + n*0.13 + 2.6);
     o.connect(g).connect(master); o.start(t0 + n*0.13); o.stop(t0 + n*0.13 + 2.8); });
 }
 

@@ -14,7 +14,7 @@ Object.assign(window, { THREE, EffectComposer, ShaderPass, UnrealBloomPass, Full
 const FILES = ['core.js', 'seafloor.js', 'fish.js', 'creatures.js', 'avatars.js', 'post.js', 'village.js', 'town.js', 'weather.js',
   'state.js', 'model.js', 'season.js', 'dive.js', 'flow.js', 'saves.js', 'main.js'];
 // the game's version: shown on the title screen, and used to make browsers fetch fresh files after an update
-const VERSION = '0.1.0-dev'; window.GAME_VERSION = VERSION;
+const VERSION = '0.1.1-dev'; window.GAME_VERSION = VERSION;
 const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const bust = local || new URLSearchParams(location.search).has('nocache') ? '?t=' + Date.now() : '?v=' + VERSION;
 if(bust){ const css = document.querySelector('link[href="src/style.css"]'); if(css) css.href = 'src/style.css' + bust; } // dev: pick up style edits without a hard reload

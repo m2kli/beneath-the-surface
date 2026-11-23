@@ -2,7 +2,7 @@
 
 A fishing village on a floating cut-away island, and the reef it lives on. You run the village season by season from the shore, and dive into the sea to see, and fix, what the village is doing to it. Built with three.js; UI in Chinese.
 
-> **Status: in development (v0.1.0-dev).** Balance, content and visuals are still changing, and saves from an older version may not load.
+> **Status: in development (v0.1.1-dev).** Balance, content and visuals are still changing, and saves from an older version may not load.
 
 **在线试玩 / Play:** https://m2kli.github.io/beneath-the-surface/
 
