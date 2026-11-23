@@ -69,6 +69,8 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:cros
 #intro p{max-width:500px;font-size:21px;line-height:1.5;opacity:.88;margin:24px 0 34px;font-style:italic}
 #intro .en{font-size:11px;letter-spacing:.6em;opacity:.6;margin-top:14px}
 #intro .how{margin-top:28px;font-size:11px;letter-spacing:.12em;opacity:.5}
+#intro .devtag{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font-size:11px;letter-spacing:.06em;padding:5px 12px;border-radius:14px;background:rgba(255,190,90,.14);border:1px solid rgba(255,190,90,.45);color:#ffe2b0;white-space:nowrap}
+#intro .devtag b{font-weight:600;color:#ffd08a;margin-right:4px}
 #ending{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
   opacity:0;transition:opacity 2.5s;pointer-events:none;padding:0 16px}
 #ending.on{opacity:1;pointer-events:auto}

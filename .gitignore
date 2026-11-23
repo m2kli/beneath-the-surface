@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 tools/out/
 adapt_run.mjs
+.claude/
