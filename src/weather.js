@@ -159,13 +159,16 @@ function applyWeather(dt, t, running, dayW, duskW, nightW){
   renderClock();
 }
 let clockTxt = '';
+document.addEventListener('ocean-language-changed',()=>{ clockTxt=''; renderClock(); });
 function renderClock(){
   const h = Math.floor(clockF*24), m = Math.floor((clockF*24 - h)*60);
   const night = clockF < 0.23 || clockF > 0.79, icon = night && (wx.cur === 'clear' || wx.cur === 'cloudy') ? 'moon' : WX_ICON[wx.cur];
   const txt = `${String(h).padStart(2, '0')}:${String(m - m % 5).padStart(2, '0')}|${wx.cur}|${icon}|${clockRun}`;
   if(txt === clockTxt) return; clockTxt = txt;
   $('clockT').textContent = `${String(h).padStart(2, '0')}:${String(m - m % 5).padStart(2, '0')}`;
-  $('wxName').textContent = WX_NAME[wx.cur];
+  $('wxName').textContent = gameText(WX_NAME[wx.cur]);
+  $('wxBtn').setAttribute('aria-label',gameText(WX_NAME[wx.cur]));
+  $('wxBtn').title=gameText(WX_NAME[wx.cur]);
   $('wxBtn').querySelector('use').setAttribute('href', '#i-' + icon);
   $('clockBtn').querySelector('use').setAttribute('href', clockRun ? '#i-pause' : '#i-play');
 }
@@ -202,8 +205,8 @@ function updateDiorama(dt){
   $('village').classList.toggle('running', running);
   if(running){
     $('montage').classList.add('on');
-    $('montage').querySelector('.ms').textContent = seasonName(V.season);
-    $('montage').querySelector('.md').textContent = `第 ${Math.min(90, Math.floor(stateT/RUN*90) + 1)} 天`;
+    $('montage').querySelector('.ms').textContent = gameText(seasonName(V.season));
+    $('montage').querySelector('.md').textContent = gameText(`第 ${Math.min(90, Math.floor(stateT/RUN*90) + 1)} 天`);
     $('montage').querySelector('.mb i').style.width = `${Math.min(100, stateT/RUN*100)}%`;
     if(prevF < 0.74 && dayF >= 0.74){
       if(V.pol.fish !== 'ban' && V.boats + V.trawlers > 0) coin('◎', new THREE.Vector3(8, 3, 6));
@@ -212,7 +215,11 @@ function updateDiorama(dt){
   } else $('montage').classList.remove('on');
   // --- ocean in miniature
   const wp = wTopGeo.attributes.position;
-  for(let i=0;i<wp.count;i++){ const x = wBase[i*3], z = wBase[i*3 + 2]; wp.setY(i, wBase[i*3 + 1] + (Math.sin(x*0.35 + t*(1.4 + wx.wind*0.8))*0.08 + Math.cos(z*0.3 + t*1.1)*0.07)*wx.wave); }
+  for(let x=0;x<waterColumns;x++) waveX[x] = Math.sin(wBase[x*3]*0.35 + t*(1.4 + wx.wind*0.8))*0.08;
+  for(let row=0;row<wp.count;row+=waterColumns){
+    const waveZ = Math.cos(wBase[row*3+2]*0.3 + t*1.1)*0.07;
+    for(let x=0;x<waterColumns;x++){ const i = row+x; wp.setY(i, wBase[i*3+1] + (waveX[x] + waveZ)*wx.wave); }
+  }
   wp.needsUpdate = true; wTopGeo.computeVertexNormals();
   foamMat.opacity = (0.4 + 0.2*Math.sin(t*1.8))*(0.25 + 0.75*(dayW + duskW))*(1 + wx.wind*0.5);
   // --- village
@@ -254,7 +261,7 @@ function updateDiorama(dt){
 const coins = [];
 function coin(text, p, color = '#a8631c'){
   if($('village').classList.contains('modal')) return;
-  const el = document.createElement('div'); el.className = 'coin'; el.textContent = text; el.style.color = color; document.body.appendChild(el);
+  const el = document.createElement('div'); el.className = 'coin'; el.textContent = gameText(text); el.style.color = color; document.body.appendChild(el);
   coins.push({ el, p: p.clone(), t: 0 });
 }
 function sendBoatsOut(){

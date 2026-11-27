@@ -165,11 +165,14 @@ function seaObjective(netsLeft){
   return parts.length ? '水下 · ' + parts.join(' · ') : '这一季水下的事都做完了。准备好了就浮上水面。';
 }
 function ensureSea(){ if(!V.sea || V.sea.season < V.season) V.sea = rollSea(eco, V, V.season, rng); }
-function startSeaDive(){
+function startSeaDive(focused=false){
   ensureSea(); const S = V.sea; layoutSea(S); S.dived = true;
   nightT = night = dioNight;   // the same time of day as the shore you dived from
   sea3.start = { seen: SEA_KEYS.filter(k => S.seen[k]).length, cots: S.gone.cots.length, trash: S.gone.trash.length, ev: S.evFound };
-  if(!V.seaTut){ V.seaTut = true; cue(3, () => toast('水下能做的事', '在发光的调查点停 2 秒：海洋预测去掉 ?。清掉长棘海星和垃圾。去看看标着 ? 的地方。', 9000)); }
+  if(!focused) showFreeDiveTip();
+}
+function showFreeDiveTip(){
+  if(!V.seaTut){ V.seaTut = true; cue(3, () => toast('水下能做的事', '在发光的调查点停 2 秒，预测就会更新。你还可以清长棘海星、捡垃圾，或去看看标着问号的地方。', 9000)); }
 }
 // back on land: what this dive did, and a decision if you found trouble
 const SEA_EV_TXT = {
@@ -180,6 +183,7 @@ const seaDmg = E => [E.coral ? `珊瑚 −${(E.coral*100).toFixed(1).replace('.0
 function seaDebrief(back){
   const S = V.sea, st = sea3.start; sea3.start = null; if(!S || !st) return;
   const a = SEA_KEYS.filter(k => S.seen[k]).length - st.seen, c = S.gone.cots.length - st.cots, t = S.gone.trash.length - st.trash, parts = [];
+  if(a){ vTab = 'pol'; $('vBody').scrollTop = 0; }
   if(a) parts.push(`调查了 ${a} 处`); if(c) parts.push(`清掉 ${c} 只长棘海星`); if(t) parts.push(`捡走 ${t} 处垃圾`); if(S.evFound && !st.ev) parts.push(`发现了${SEA_EV[S.ev].n}`);
   if(parts.length) setTimeout(() => toast('这次下潜', parts.join('，') + '。' + (a ? ' 预测已经按你看到的更新了。' : ''), 7000), 300);
   if(S.evFound && !S.evDone) showSeaEvent(back);
@@ -188,8 +192,8 @@ function showSeaEvent(back){
   const S = V.sea, E = SEA_EV[S.ev], T = SEA_EV_TXT[S.ev];
   setState('event'); $('village').classList.add('modal'); $('vReport').classList.remove('on');
   const opts = [{ t: '不管它', d: `季末${seaDmg(E)}。`, fix: false }, { t: T.fixT, d: T.fixD(E), fix: true }];   // left: free but risky, right: costs money, safe
-  $('vEvent').innerHTML = `<div class="kicker crisis">${seasonName(S.season)} · 水下发现</div><h3>${T.t}</h3><p>${T.x}</p>
-    <div class="opts">${opts.map((o, i) => `<button data-i="${i}"><b>${o.t}</b><span>${o.d}</span></button>`).join('')}</div>`;
+  setGameHTML($('vEvent'), `<div class="kicker crisis">${seasonName(S.season)} · 水下发现</div><h3>${T.t}</h3><p>${T.x}</p>
+    <div class="opts">${opts.map((o, i) => `<button data-i="${i}"><b>${o.t}</b><span>${o.d}</span></button>`).join('')}</div>`);
   $('vEvent').querySelectorAll('button').forEach(b => b.onclick = () => { S.evDone = true;
     if(opts[+b.dataset.i].fix){ S.evFix = true; V.money += E.gain - E.fix; }
     $('vEvent').classList.remove('on'); setState(back);
@@ -221,7 +225,8 @@ function updateSeaMarks(){
       $('marks').appendChild(el); seaMk.els.push(el); }
     el.dataset.i = i;
     const txt = it.label + (it.n > 1 ? ' ×' + it.n : '');
-    if(el.dataset.t !== it.kind + txt){ el.dataset.t = it.kind + txt; el.className = 'smk ' + it.kind; el.innerHTML = `<i></i><span>${txt}</span>`; el.title = '点击潜下去'; }
+    const labelKey=GameLocale.language+it.kind+txt;
+    if(el.dataset.t !== labelKey){ el.dataset.t = labelKey; el.className = 'smk ' + it.kind; setGameHTML(el, `<i></i><span>${txt}</span>`); el.title = gameText('点击潜下去'); }
     const p = pB.copy(it.pos).project(camera); let ok = p.z < 1 && Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.95;
     if(ok){ it.sx = (p.x*0.5 + 0.5)*innerWidth; it.sy = (-p.y*0.5 + 0.5)*innerHeight; ok = !underUI(it.sx, it.sy) && !!portalVisibleAt(it.sx, it.sy); }
     it.ok = ok; el.classList.toggle('on', ok);

@@ -16,10 +16,10 @@ const POIS = [
 function setState(s){ state = s; stateT = 0; cues = []; }
 function cue(at, fn){ cues.push({ at, fn, done: false }); }
 function toast(kicker, text, ms = 5200){
-  $('toast').innerHTML = `<small>${kicker}</small>${text}`; $('toast').classList.add('on');
+  setGameHTML($('toast'), `<small>${kicker}</small>${text}`); $('toast').classList.add('on');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('on'), ms);
 }
-function objective(t){ if($('objective').textContent !== t) $('objective').textContent = t; }
+function objective(t){ const value=gameText(t); if($('objective').textContent !== value) $('objective').textContent=value; }
 function pulseAt(p){ U.uPulse.value.set(p.x, p.y, p.z, 0); pulseT = 0; }
 function fade(fn){ const f = $('fade'); f.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => f.classList.remove('on'), 150); }, 650); }
 
@@ -31,7 +31,7 @@ function showVillageBackdrop(){
 function start(loaded){
   if(state !== 'intro') return; document.body.classList.add('started');
   POIS.forEach(p => p.found = true); exploreDone = true;
-  $('intro').classList.add('off'); $('hud').classList.add('on');
+  $('intro').classList.add('off'); $('intro').inert=true; $('playUI').inert=false; $('hud').classList.add('on');
   initAudio();
   enterVillage(() => setState('plan'));
   if(loaded) cue(0.8, () => toast('读取存档', `${seasonName(V.season)} · ${TIERS[devTier(V)].n}。接着上次的地方继续。`, 5000));
@@ -74,8 +74,6 @@ const fmt = x => (x >= 0 ? '+' : '−') + Math.abs(Math.round(x));
 // change arrows, the same everywhere: green up, red down; one to three arrows for small, clear, large; ? where it is not known
 const arrows = (d, unsure) => { const m = Math.abs(d), n = m < 0.004 ? 0 : m < 0.015 ? 1 : m < 0.04 ? 2 : 3;
   return (n ? `<span class="${d > 0 ? 'up' : 'dn'}">${(d > 0 ? '▲' : '▼').repeat(n)}</span>` : '<span class="eq">–</span>') + (unsure ? '<span class="q">?</span>' : ''); };
-// after the fact (the report): measured, so arrows and the exact change
-const trend = (a, b) => `<span class="trc"><span class="tr">${arrows(b - a)}</span><small>${Math.abs(b - a) < 0.0005 ? '' : (b > a ? '+' : '−') + (Math.abs(b - a)*100).toFixed(1)}</small></span>`;
 const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
 const POL_ICON = { fish: 'fish', tour: 'mask', zone: 'shield', waste: 'drop', work: 'clock', tax: 'coin' };
 const BUILD_INFO = {
@@ -85,26 +83,26 @@ const BUILD_INFO = {
 V.built = []; V.buildSpent = 0;
 function setDelta(id, d, fmtFn){
   const el = $(id); const r = Math.round(d*10)/10;
-  el.className = 'dl ' + (Math.abs(r) < 0.5 ? 'eq' : r > 0 ? 'up' : 'dn'); el.textContent = Math.abs(r) < 0.5 ? '' : (fmtFn ? fmtFn(r) : fmt(r));
+  el.className = 'dl ' + (Math.abs(r) < 0.5 ? 'eq' : r > 0 ? 'up' : 'dn'); el.textContent = gameText(Math.abs(r) < 0.5 ? '' : (fmtFn ? fmtFn(r) : fmt(r)));
 }
 function renderVillageUI(){
   queueAutosave();
   const s = V.season, over = state === 'over';
-  $('vSeason').textContent = over ? '四年之后' : seasonName(s);
+  $('vSeason').textContent = gameText(over ? '四年之后' : seasonName(s));
   $('vTurn').textContent = over ? `${SEASONS_PER_GAME} / ${SEASONS_PER_GAME}` : `${s + 1} / ${SEASONS_PER_GAME}`;
-  $('vPips').innerHTML = Array.from({ length: SEASONS_PER_GAME }, (_, i) => `${i && i % 4 === 0 ? '<i class="gap"></i>' : ''}<i class="${i < s || over ? 'done' : i === s ? 'now' : ''}" title="${seasonName(i)}"></i>`).join('');
+  setGameHTML($('vPips'), Array.from({ length: SEASONS_PER_GAME }, (_, i) => `${i && i % 4 === 0 ? '<i class="gap"></i>' : ''}<i class="${i < s || over ? 'done' : i === s ? 'now' : ''}" title="${seasonName(i)}"></i>`).join(''));
   $('vMoney').textContent = Math.round(V.money); $('vMoney').style.color = V.money < 0 ? 'var(--coral-d)' : '';
-  $('vFood').innerHTML = `${V.food.toFixed(1)}<small> 吨</small>`;
+  setGameHTML($('vFood'), `${V.food.toFixed(1)}<small> 吨</small>`);
   { const cl = V.cold ? lvOf(V, 'cold', 0) : 0, need = V.pop*0.12, keep = cl ? need : need*0.3, price = 13*SEASON_FX[V.season % 4].price*[1, 1.1, 1.18][cl];
-    $('vFood').parentElement.dataset.tip = `存鱼 ${V.food.toFixed(1)} 吨。每季村民吃 ${need.toFixed(1)} 吨（${V.pop} 人 × 0.12），最多留 ${keep.toFixed(1)} 吨过季，其余按 ${price.toFixed(0)}/吨 卖出。留下的鱼每季坏 ${[35, 5, 3][cl]}%${cl ? '' : '（建冷库降到 5%）'}。不够吃时村库按 ${REC.food}/吨 进口。`; }
-  $('vPop').innerHTML = `${V.pop}<small> / ${W(V, 'house', [4, 6, 8])}</small>`;
+    $('vFood').parentElement.dataset.tip = gameText(`存鱼 ${V.food.toFixed(1)} 吨。每季村民吃 ${need.toFixed(1)} 吨（${V.pop} 人 × 0.12），最多留 ${keep.toFixed(1)} 吨过季，其余按 ${price.toFixed(0)}/吨 卖出。留下的鱼每季坏 ${[35, 5, 3][cl]}%${cl ? '' : '（建冷库降到 5%）'}。不够吃时村库按 ${REC.food}/吨 进口。`); }
+  setGameHTML($('vPop'), `${V.pop}<small> / ${W(V, 'house', [4, 6, 8])}</small>`);
   $('vMorale').textContent = Math.round(V.morale); $('vMorale').style.color = V.morale < 30 ? 'var(--coral-d)' : '';
   $('vMoraleBar').style.width = V.morale + '%';
   $('vRep').textContent = Math.round(V.rep*100);
   { const sc = devScore(V), T = devTier(V), nx = TIERS[T + 1];
-    $('vTier').textContent = TIERS[T].n; $('vTierBar').style.width = (nx ? clamp((sc - TIERS[T].at)/(nx.at - TIERS[T].at), 0, 1)*100 : 100) + '%';
-    $('vTierNext').textContent = nx ? `→ ${nx.n}` : '最高';
-    document.body.style.setProperty('--hudTop', ($('vTop').offsetTop + $('vTop').offsetHeight + 12) + 'px'); }
+    $('vTier').textContent = gameText(TIERS[T].n); $('vTierBar').style.width = (nx ? clamp((sc - TIERS[T].at)/(nx.at - TIERS[T].at), 0, 1)*100 : 100) + '%';
+    $('vTierNext').textContent = gameText(nx ? `→ ${nx.n}` : '最高');
+  }
   const plan = state === 'plan';
   $('vTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === vTab));
   $('vPol').style.display = vTab === 'pol' ? '' : 'none'; $('vBuild').classList.toggle('show', vTab === 'build');
@@ -116,10 +114,10 @@ function renderVillageUI(){
       ${lock ? `<span class="tag">${ic('lock')}锁定 ${lock} 季</span>` : spring ? '<span class="tag">产卵季</span>' : ''}</div>
       <div class="pseg">${pl.opts.map(x => `<button data-k="${pl.k}" data-v="${x.v}" class="${x.v === cur ? 'on' : ''}" ${!plan || lock ? 'disabled' : ''}>${x.n}</button>`).join('')}</div>
       <div class="pd">${pl.opts.map(x => `<span data-v="${x.v}" class="${x.v === cur ? 'show' : ''}">${typeof x.d === 'function' ? x.d(V) : x.d}${pl.k === 'fish' && V.prevPol && FISH_RANK[x.v] < FISH_RANK[V.prevPol.fish] ? ' <span class="warn">· 渔民会不满</span>' : ''}</span>`).join('')}</div></div>`; };
-  $('vPol').innerHTML = `<div class="pg">${ic('wave')}海</div>${POLICIES.filter(p => ['fish', 'zone', 'waste', 'tour'].includes(p.k)).map(row).join('')}
-    <div class="pg v">${ic('house')}村</div>${POLICIES.filter(p => ['work', 'tax'].includes(p.k)).map(row).join('')}`;
+  setGameHTML($('vPol'), `<div class="pg">${ic('wave')}海</div>${POLICIES.filter(p => ['fish', 'zone', 'waste', 'tour'].includes(p.k)).map(row).join('')}
+    <div class="pg v">${ic('house')}村</div>${POLICIES.filter(p => ['work', 'tax'].includes(p.k)).map(row).join('')}`);
   $('vPol').querySelectorAll('.pseg button').forEach(b => {
-    b.onclick = () => { if(state !== 'plan' || V.locks[b.dataset.k]) return; V.pol[b.dataset.k] = b.dataset.v; renderVillageUI(); chime(1); };
+    b.onclick = () => choosePolicy(b.dataset.k, b.dataset.v);
     b.onmouseenter = () => {
       const pl = POLICIES.find(p => p.k === b.dataset.k), o = pl.opts.find(x => x.v === b.dataset.v);
       showDesc(b, b.dataset.v, b.dataset.v !== V.pol[pl.k]);
@@ -129,11 +127,11 @@ function renderVillageUI(){
   });
   // buildings as cards that say why they can't be built
   const builtNow = (V.ups || []).map(u => `<button data-u="${u.k}:${u.i}" title="撤销升级，退还 ${u.c}">升级${BUILD.find(b => b.k === u.k).name} ✕</button>`).join('') + V.built.map((k, i) => `<button data-i="${i}" title="撤销，退还 ${BUILD.find(b => b.k === k).cost}">${BUILD.find(b => b.k === k).name} ✕</button>`).join('');
-  $('vBuild').innerHTML = `<div id="vBuilt">${builtNow ? '本季已建：' + builtNow : ''}</div>` + BUILD.map(b => { const have = V[KEY[b.k]] || 0, mx = maxOf(V, b.k), full = have >= mx, info = BUILD_INFO[b.k], locked = b.need && !V[KEY[b.need]];
+  setGameHTML($('vBuild'), `<div id="vBuilt">${builtNow ? '本季已建：' + builtNow : ''}</div>` + BUILD.map(b => { const have = V[KEY[b.k]] || 0, mx = maxOf(V, b.k), full = have >= mx, info = BUILD_INFO[b.k], locked = b.need && !V[KEY[b.need]];
     const why = !plan ? (state === 'event' ? '先处理事件' : '本季进行中') : locked ? `需要先建${BUILD.find(x => x.k === b.need).name}` : full ? (b.need ? '升级渔港能停更多' : '已达上限') : V.money < b.cost ? `还差 ${Math.ceil(b.cost - V.money)}` : '';
     return `<button class="bc" data-k="${b.k}" ${why ? 'disabled' : ''}><div class="bt">${ic(info.icon)}${b.name}<span class="cnt">${b.max > 1 ? have + '/' + mx : have ? '已建' : ''}</span></div>
       <div class="chips"><span class="chip cost">${ic('coin')}${b.cost}</span>${info.crew ? `<span class="chip" title="需要的人手">${ic('people')}${info.crew}</span>` : ''}</div>
-      <div class="bd">${b.desc}</div><div class="why">${why}</div></button>`; }).join('');
+      <div class="bd">${b.desc}</div><div class="why">${why}</div></button>`; }).join(''));
   $('vBuild').querySelectorAll('button.bc').forEach(el => {
     el.onclick = () => build(el.dataset.k);
     el.onmouseenter = () => { if(!el.disabled){ const b = BUILD.find(x => x.k === el.dataset.k); renderForecast(v => { v[KEY[b.k]] = (v[KEY[b.k]] || 0) + 1; v.money -= b.cost; }, `如果建「${b.name}」`); } };
@@ -141,14 +139,55 @@ function renderVillageUI(){
   });
   $('vBuilt') && $('vBuilt').querySelectorAll('button').forEach(el => el.onclick = () => el.dataset.u ? undoUpgrade(el.dataset.u.split(':')[0], +el.dataset.u.split(':')[1]) : unbuild(+el.dataset.i));
   renderForecast();
+  renderSurveyAdvice();
+  renderBayShore();
   const runLabel = state === 'event' ? '先处理突发事件' : state === 'running' ? '本季进行中…' : state === 'prompt' ? '等待你的决定' : (state === 'report' || state === 'tally') ? '看完报告再继续' : '开始本季';
-  $('vRun').querySelector('span').textContent = runLabel;
-  $('vRun').disabled = !plan; $('vDive').disabled = !(plan || state === 'report' || state === 'over');
+  $('vRun').querySelector('span').textContent = gameText(runLabel);
+  $('vRun').disabled = !plan; $('vDive').disabled = !plan;
+  $('skipMontage').hidden = !(V.season >= 4 && state === 'running');
   { const S = V.sea, fresh = plan && S && S.season === V.season && (!S.dived || SEA_KEYS.some(k => !S.seen[k])); $('vDive').classList.toggle('ping', !!fresh);
-    if(fresh) $('vDive').dataset.tip = S.dived ? '还有调查点没去。调查过的数字，预测才准。' : '这一季还没人下去看过：调查能让预测变准，还能清理海星和垃圾。'; else delete $('vDive').dataset.tip; }
+    if(plan && S && BAY_SEASONS[S.season]) $('vDive').dataset.tip = gameText(BAY_SEASONS[S.season][0]+'。进入本季现场，也可切换自由潜游。'); else delete $('vDive').dataset.tip; }
   if(window.__focusOn) renderFocus();
 }
 function showDesc(b, v, hover){ b.closest('.prow').querySelectorAll('.pd > span').forEach(sp => { sp.classList.toggle('show', sp.dataset.v === v); sp.classList.toggle('hv', hover && sp.dataset.v === v); }); }
+function choosePolicy(key, value){
+  if(state !== 'plan' || V.locks[key]) return;
+  V.pol[key] = value;
+  renderVillageUI(); chime(1);
+}
+// Only the samples already collected can inform the village's comparison.
+function renderSurveyAdvice(requested){
+  const box = $('surveyAdvice'), S = V.sea;
+  const seen = Object.keys(S?.seen || {}).filter(k => S.seen[k] && SEA_KEYS.includes(k));
+  box.hidden = !(state === 'plan' && vTab === 'pol' && S?.season === V.season && seen.length);
+  if(box.hidden) return;
+  const latest = seen[seen.length - 1], signature = `${V.runId}/${V.season}/${latest}`;
+  const key = requested || (box.dataset.survey === signature && box.dataset.sample) || latest;
+  box.dataset.survey = signature; box.dataset.sample = key;
+  const site = {coral:'礁区调查', fish:'鱼苗调查', pel:'远洋调查'};
+  const names = {coral:'珊瑚', fish:'鱼群', pel:'远洋鱼群'};
+  const readings = {coral:['水温偏高','水温平稳','水温适宜'], fish:['鱼苗偏少','鱼苗接近往年','鱼苗偏多'], pel:['洄游偏晚','洄游接近往年','洄游偏早']};
+  const effect = S.t[key], finding = readings[key][effect < -0.007 ? 0 : effect > 0.007 ? 2 : 1];
+  const group = key === 'coral' ? 'waste' : 'fish', current = V.pol[group];
+  const other = group === 'waste' ? (current === 'basic' ? 'full' : 'basic') : (current === 'line' || current === 'ban' ? 'quota' : 'line');
+  const options = POLICIES.find(p => p.k === group).opts;
+  const knownSea = seaView(S, 0), metric = key === 'pel' ? 'pelagic' : key;
+  const choice = value => {
+    const {e, v} = simulateSeason(eco, {...V, pol:{...V.pol, [group]:value}, sea:knownSea}, 0);
+    const selected = value === current, locked = !!V.locks[group], name = options.find(o => o.v === value).n;
+    return `<button type="button" data-value="${value}" ${selected || locked ? 'disabled' : ''}><b>${name}</b>
+      <span>${names[key]} <strong>${r1(e[metric]*100)}%</strong></span><span>村库 <strong>${v.money}</strong></span>
+      <small>${selected ? '已采用' : locked ? '本季已锁定' : '采用此政策'}</small></button>`;
+  };
+  const selector = seen.length === 1 ? `<b>${site[key]}</b>` :
+    `<select aria-label="查看调查结果">${seen.map(k => `<option value="${k}" ${k === key ? 'selected' : ''}>${site[k]}</option>`).join('')}</select>`;
+  setGameHTML(box, `<div class="survey-reading">${selector}<span>${finding}</span></div>
+    <p>${names[key]}季节影响 ${signed1(effect*100)} 个百分点</p>
+    <div class="survey-caption">两种政策的季末预测</div><div class="survey-options">${choice(current)}${choice(other)}</div>`);
+  const select = box.querySelector('select');
+  if(select) select.onchange = () => { renderSurveyAdvice(select.value); box.querySelector('select').focus(); };
+  for(const button of box.querySelectorAll('button')) button.onclick = () => choosePolicy(group, button.dataset.value);
+}
 // the forecast, optionally for a hypothetical change (hovering an option or a building)
 function renderForecast(mutate, label){
   if(state === 'over'){ $('vPredict').innerHTML = ''; return; }
@@ -174,7 +213,7 @@ function renderForecast(mutate, label){
   const why = (r.grant > 0.5 ? `<div><span>村库 · 海洋保护资助</span><b class="pos">${fmt(r.grant - r.wages)}</b></div><div><span>村民 · 修复礁区的工资</span><b class="pos">${fmt(r.wages)}</b></div>` : '') + r.morale.map(([l, x]) => `<div><span>${l}</span><b class="${x < 0 ? 'negc' : 'pos'}">${fmt(x)}</b></div>`).join('') + r.pub.map(([l, x]) => `<div><span>村库 · ${l}</span><b class="negc">${fmt(-x)}</b></div>`).join('');
   const whyOpen = !!$('vPredict').querySelector('details[open]');
   $('vPredict').classList.toggle('preview', !!mutate);
-  $('vPredict').innerHTML = `<div class="pt">${ic('info')}本季预测<span class="pv">${label || ''}</span></div>
+  setGameHTML($('vPredict'), `<div class="pt">${ic('info')}本季预测<span class="pv">${label || ''}</span></div>
     <div class="big"><div${hl(v.money, base.v.money)}><small>${ic('coin')}村库</small><b>${Math.round(V.money)} → ${Math.round(v.money)}</b></div>
       <div${hl(r.dMor, b.dMor)}><small>${ic('heart')}民心</small><b>${Math.round(V.morale)} → ${Math.round(v.morale)}</b></div></div>
     <div class="sm"><div${hl(r.catchT, b.catchT)}><span>渔获</span><b>${r.catchT.toFixed(1)} 吨</b></div>
@@ -183,7 +222,7 @@ function renderForecast(mutate, label){
     <div class="fl" data-tip="每季先给村民吃（每人 0.12 吨），再留一部分过季（没有冷库留三成口粮，有冷库留一整季），其余按鱼价卖出。留下的鱼没有冷库会坏 35%。">${ic('fish')}<span>鱼货</span><b>存 ${r.stock0.toFixed(1)} + 捕 ${r.catchT.toFixed(1)}</b><i>→</i><span>吃 ${r.eat.toFixed(1)}</span><span>卖 ${r.sold.toFixed(1)}×${r.fishPrice.toFixed(0)}=<b class="pos">${Math.round(r.sold*r.fishPrice)}</b></span><span>留 ${r.food.toFixed(1)}${r.spoiled > 0.05 ? `<em class="negc"> 坏 ${r.spoiled.toFixed(1)}</em>` : ''}</span></div>
     <div class="warns${warns.length ? '' : ' ok'}"${warns.length > 2 ? ` title="${warns.join(' / ')}"` : ''}>${warns.length ? warns.slice(0, 2).map(w => `<div>${ic('warn')}<span>${w}</span></div>`).join('') : `<div>${ic('good')}<span>暂时没有明显风险。</span></div>`}</div>
     ${seaRow(cur.e, lo, hi, SS)}
-    <details${whyOpen ? ' open' : ''}><summary>为什么？ ▾</summary>${why || '<div>平平淡淡</div>'}</details>`;
+    <details${whyOpen ? ' open' : ''}><summary>为什么？ ▾</summary>${why || '<div>平平淡淡</div>'}</details>`);
   // left column: deltas from the forecast; ocean card: hatched ghost of where it is heading
   if(!mutate){
     setDelta('dMoney', v.money - V.money); setDelta('dFood', v.food - V.food); setDelta('dPop', v.pop - V.pop); setDelta('dMorale', v.morale - V.morale); setDelta('dRep', (v.rep - V.rep)*100);
@@ -192,12 +231,12 @@ function renderForecast(mutate, label){
   { const LUCK = ['风平浪静的一季', '水温偏高', '鱼苗多', '鱼苗少'];   // the season's luck stays hidden until surveyed
     const why = (list0, unsure) => { const list = list0.filter(x => !(unsure && LUCK.includes(x[0]))); return list.length ? list.slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([l, x]) => `${l} ${x > 0 ? '▲' : '▼'}${Math.abs(x) >= 0.015 ? (x > 0 ? '▲' : '▼') : ''}`).join('　') + (unsure ? '　（还有没调查的季节变化）' : '') : '基本不变' + (unsure ? '（还有没调查的季节变化）' : ''); };
     const S = V.sea, un = k => !!S && !S.seen[k];
-    $('mCoral').closest('.m').dataset.tip = `珊瑚：被拖网、游客、污水和热浪伤到会减少，受保护、水干净时会长回来。竖线是 55% 的目标。
-本季：${why(r.coralWhy || [], un('coral'))}`;
-    $('mFish').closest('.m').dataset.tip = `鱼群：繁殖快于捕捞就会增加；珊瑚越好，能养的鱼越多。竖线是 55% 的目标。
-本季：${why(r.fishWhy || [], un('fish'))}`;
-    $('mWater').closest('.m').dataset.tip = `水质：污水和游客垃圾让水变浑；水越浑，珊瑚越难恢复，游客越少。
-本季污染指数 ${Math.round(r.nutr*100)}（超过 22 可能赤潮）。直排时污水全部入海，简易处理剩 40%，全面处理剩 10%。`; }
+    $('mCoral').closest('.m').dataset.tip = gameText(`珊瑚：被拖网、游客、污水和热浪伤到会减少，受保护、水干净时会长回来。竖线是 55% 的目标。
+本季：${why(r.coralWhy || [], un('coral'))}`);
+    $('mFish').closest('.m').dataset.tip = gameText(`鱼群：繁殖快于捕捞就会增加；珊瑚越好，能养的鱼越多。竖线是 55% 的目标。
+本季：${why(r.fishWhy || [], un('fish'))}`);
+    $('mWater').closest('.m').dataset.tip = gameText(`水质：污水和游客垃圾让水变浑；水越浑，珊瑚越难恢复，游客越少。
+本季污染指数 ${Math.round(r.nutr*100)}（超过 22 可能赤潮）。直排时污水全部入海，简易处理剩 40%，全面处理剩 10%。`); }
   const pv = !!mutate; setTrend('tCoral', eco.coral, lo.coral, hi.coral, pv); setTrend('tWater', eco.clar, e.clar, e.clar, pv); setTrend('tFish', eco.fish, lo.fish, hi.fish, pv); setTrend('tPel', eco.pelagic ?? 1, lo.pelagic ?? 1, hi.pelagic ?? 1, pv);
 }
 // what the village knows about the sea this season: the jobs waiting down there and the trouble it was told about
@@ -214,7 +253,7 @@ function seaRow(e, lo, hi, S){
 function setTrend(id, a, lo, hi, preview){
   const el = $(id); if(!el) return; if(mode !== 'village'){ el.innerHTML = ''; return; }
   const dl = lo - a, dh = hi - a, unsure = Math.abs(dh - dl) > 0.003;
-  el.innerHTML = unsure && Math.sign(dl) !== Math.sign(dh) && Math.max(Math.abs(dl), Math.abs(dh)) > 0.004 ? '<span class="eq">?</span>' : arrows((dl + dh)/2, unsure);
+  setGameHTML(el, unsure && Math.sign(dl) !== Math.sign(dh) && Math.max(Math.abs(dl), Math.abs(dh)) > 0.004 ? '<span class="eq">?</span>' : arrows((dl + dh)/2, unsure));
   el.classList.toggle('pv', preview);
 }
 $('vTabs').addEventListener('click', e => { const bt = e.target.closest('button'); if(bt && bt.dataset.t){ vTab = bt.dataset.t; renderVillageUI(); } });
@@ -247,25 +286,51 @@ function undoUpgrade(k, i){
   const u = V.ups.splice(j, 1)[0]; V.lv[k][i]--; V.money += u.c; V.buildSpent -= u.c; renderVillageUI(); return true;
 }
 // tooltips for anything with data-tip
-document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if(t){ $('tip').textContent = t.dataset.tip; $('tip').classList.add('on'); } });
+document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if(t){ $('tip').textContent = gameText(t.dataset.tip); $('tip').classList.add('on'); } });
 document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if(t && !t.contains(e.relatedTarget)) $('tip').classList.remove('on'); });
-document.addEventListener('mousemove', e => { if($('tip').classList.contains('on')){ const w = $('tip').offsetWidth; $('tip').style.transform = `translate(${Math.min(e.clientX + 14, innerWidth - w - 10)}px, ${e.clientY + 16}px)`; } });
+document.addEventListener('mousemove', e => {
+  const tip=$('tip');
+  if(!tip.classList.contains('on')) return;
+  const left=Math.max(6,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-6));
+  const top=e.clientY+16+tip.offsetHeight<=innerHeight-6 ? e.clientY+16 : Math.max(6,e.clientY-tip.offsetHeight-8);
+  tip.style.transform=`translate(${left}px, ${top}px)`;
+});
 // first-season coach
 const COACH = [
   { sel: '#hud', side: 'l', t: '这是门前的海', x: '箭头是本季预计的变化，带 ? 表示还没潜下去调查。四年后，珊瑚和鱼群要守在竖线（55%）以上。' },
   { sel: '#vTop', side: 'l', t: '这是你的渔村', x: '右边的小标签是本季预计变化的精确数字。建设越多，村子会从小渔村长成渔镇、海滨小城。' },
   { sel: '#vSide', side: 'r', t: '定政策、看预测', x: '每行选一项：左边收益高、风险大，右边稳妥。鼠标移到选项或建筑上，预测会先算给你看。' },
-  { sel: '#vDive', side: 'l', t: '潜下去', x: '海面上的小标记是水下要做的事：调查、清长棘海星、捡垃圾。点标记或这个按钮直接潜到那里。' },
+  { sel: '#vDive', side: 'l', t: '潜下去', x: '点这个按钮去本季的海湾。春天先试着用水母借流找鱼，回岸后可把一艘船派去实测鱼道。海面上的小标记通往自由调查点。' },
   { sel: '#vRun', side: 'b', t: '准备好了就开始本季', x: '一共 16 季、四年。每季结束会有季报。' },
 ];
 let coachI = -1, coachDone = false;
+const compactShore=matchMedia('(max-width:900px), (max-height:600px)');
+new ResizeObserver(()=>{
+  const top=$('vTop');
+  if(!compactShore.matches && top.offsetHeight) document.body.style.setProperty('--hudTop',(top.offsetTop+top.offsetHeight+12)+'px');
+}).observe($('vTop'));
+function selectShoreView(view){
+  document.body.dataset.shoreView=view;
+  for(const button of $('shorePanels').querySelectorAll('[data-view]')){
+    button.setAttribute('aria-pressed',String(button.dataset.view===view));
+  }
+}
+$('shorePanels').addEventListener('click',e=>{
+  const button=e.target.closest('[data-view]');
+  if(button)selectShoreView(button.dataset.view);
+});
+$('diveInfoToggle').addEventListener('click',()=>{
+  const open=document.body.classList.toggle('dive-notes-open');
+  $('diveInfoToggle').setAttribute('aria-expanded',String(open));
+});
 function showCoach(i){
   coachI = i; const c = COACH[i]; if(!c){ $('coach').classList.remove('on'); $('ring').classList.remove('on'); coachDone = true; return; }
+  if(compactShore.matches) selectShoreView(c.sel==='#hud'?'ocean':c.sel==='#vTop'?'village':'plan');
   const el = document.querySelector(c.sel), rc = el.getBoundingClientRect(), co = $('coach');
-  co.querySelector('b').textContent = c.t; co.querySelector('.ctext').textContent = c.x; co.querySelector('.cstep').textContent = `${i + 1} / ${COACH.length}`;
-  co.querySelector('button').textContent = i === COACH.length - 1 ? '知道了' : '下一步';
+  co.querySelector('b').textContent = gameText(c.t); co.querySelector('.ctext').textContent = gameText(c.x); co.querySelector('.cstep').textContent = gameText(`${i + 1} / ${COACH.length}`);
+  co.querySelector('button').textContent = gameText(i === COACH.length - 1 ? '知道了' : '下一步');
   co.className = 'on ' + c.side;
-  const w = 250;
+  const w = co.offsetWidth;
   if(c.side === 'l'){ co.style.left = (rc.right + 14) + 'px'; co.style.top = (rc.top + 6) + 'px'; }
   else if(c.side === 'r'){ co.style.left = (rc.left - w - 18) + 'px'; co.style.top = (rc.top + 60) + 'px'; }
   else { co.style.left = (rc.right - w - 10) + 'px'; co.style.top = (rc.top - co.offsetHeight - 16) + 'px'; }
@@ -273,18 +338,33 @@ function showCoach(i){
   const ring = $('ring'); Object.assign(ring.style, { left: (rc.left - 4) + 'px', top: (rc.top - 4) + 'px', width: (rc.width + 8) + 'px', height: (rc.height + 8) + 'px' }); ring.classList.add('on');
 }
 $('coach').querySelector('button').addEventListener('click', () => showCoach(coachI + 1));
+addEventListener('resize',()=>{if($('coach').classList.contains('on'))showCoach(coachI);});
 $('vRun').addEventListener('click', runSeason);
-$('vDive').addEventListener('click', () => { if(mode !== 'village') return; diveInto(diveMark, 'free'); });
+$('skipMontage').addEventListener('click', () => {
+  if(V.season >= 4 && state === 'running' && !paused) settleSeason(true);
+});
+$('vDive').addEventListener('click', () => { if(mode === 'village' && state === 'plan' && !unzoom && !sysOpen) diveInto(diveMark, 'bay'); });
 $('pDive').addEventListener('click', () => { $('vPrompt').classList.remove('on'); $('village').classList.remove('modal'); diveInto(baitMark, 'trawl'); });
 $('pStay').addEventListener('click', () => { $('vPrompt').classList.remove('on'); $('village').classList.remove('modal'); autoTrawl(); beginRun(); });
 
 function runSeason(){
   if(state !== 'plan') return;
+  if($('coach').classList.contains('on') && COACH[coachI]?.sel === '#vRun') showCoach(coachI + 1);
   const trawlEvent = V.pol.fish === 'industrial' && V.trawlers > 0 && V.pol.zone !== 'wide' && eco.bait > 0.12;
   if(trawlEvent){ setState('prompt'); $('vPrompt').classList.add('on'); $('village').classList.add('modal'); renderVillageUI(); }
   else beginRun();
 }
 function beginRun(){ if(focusOn) exitFocus(); setState('running'); sendBoatsOut(); renderVillageUI(); }
+function settleSeason(immediate){
+  if(state !== 'running') return;
+  const r = seasonStep();
+  if(r.fishInc > 0.5) coin(`+${Math.round(r.fishInc)}`, new THREE.Vector3(8, 4, 8));
+  if(r.tourInc > 0.5) coin(`+${Math.round(r.tourInc)}`, new THREE.Vector3(-18, 5, -1), '#1f8a8a');
+  coin(`村库净变化 ${signed1(r.treasury.net)}`, new THREE.Vector3(0, 8, -16), r.treasury.net < 0 ? '#b8452f' : '#1d8a5a');
+  setState('tally'); renderVillageUI();
+  const present = () => { setState('report'); showReport(r); };
+  if(immediate) present(); else cue(2, present);
+}
 function autoTrawl(){
   const takenB = Math.round(eco.bait*NB*0.85), takenR = Math.round(140 + 60*eco.fish);
   pendingHaul += takenB*0.04 + takenR*0.03;
@@ -311,51 +391,62 @@ function showReport(r){
     if(sea.samples && V.research) notes.push(['good', `调查样本：研究经费 +${Math.round(sea.samples*SEA.sample)}。`]); }
   if(r.nutr > 0.3) notes.push(['bad', `排污口外藻类增多：入海污染 ${Math.round(r.nutr*100)}%。`]);
   if(V.pol.zone !== 'none' && V.mpaSeasons === 4 && eco.fish > 0.5) notes.push(['good', '保护区满 4 季：鱼开始外溢，渔获回升。']);
-  if(eco.coral < r.coralBefore - 0.005){ const worst = (r.coralWhy || []).filter(x => x[1] < 0).sort((a, b) => a[1] - b[1])[0];
-    notes.push(['bad', `珊瑚少了 ${((r.coralBefore - eco.coral)*100).toFixed(1)}%${worst ? `，主要是「${worst[0]}」` : ''}。`]); }
-  if(eco.coral > r.coralBefore + 0.01) notes.push(['good', `珊瑚 +${((eco.coral - r.coralBefore)*100).toFixed(1)}%。`]);
   if(r.pop1 < r.pop0) notes.push(['bad', `村民 −${r.pop0 - r.pop1}：${r.hungry ? '吃不饱' : '民心低于 30'}，有人搬走了。`]);
   if(r.grant > 0.5) notes.push(['good', `保护资助 ${Math.round(r.grant)}：村库 ${Math.round(r.grant - r.wages)}，修复工资 ${Math.round(r.wages)}。礁区越好，资助越少。`]);
   if(r.pop1 > r.pop0 && r.pop1 >= r.cap) notes.push(['good', `村民 +${r.pop1 - r.pop0}，住满了（${r.cap} 人）。再建民居才会长人。`]);
   if(eco.fish < 0.3) notes.push(['bad', `鱼群只剩 ${Math.round(eco.fish*100)}%。`]);
   if((eco.pelagic ?? 1) < 0.5 && (r.pelBefore ?? 1) > (eco.pelagic ?? 1)) notes.push(['bad', `远洋鱼群只剩 ${Math.round((eco.pelagic ?? 1)*100)}%：远洋渔获和观鲸收入都在下降。`]);
-  const over = isGameOver(), pct = x => Math.round(x*100) + '%';
+  const over = isGameOver(), cash = r.treasury;
+  const below = r.ocean.filter(m => m.goal != null && m.end <= m.goal);
+  const changes = r.ocean.map(m => r1((m.end - m.start)*100));
+  const risingSea = changes.some(d => d > 0), fallingSea = changes.some(d => d < 0);
+  let seaTitle = risingSea ? (fallingSea ? '海况有升有降' : '海况回升') : (fallingSea ? '海况回落' : '海况持平');
+  if(below.length) seaTitle = below.map(m => m.label).join('、') + '未过目标线';
+  const cashTitle = cash.net > 0 ? '村库净增' : cash.net < 0 ? '村库净减' : '村库持平';
+  const moneyPart = (label, value) => `<span>${label} <b class="${value < 0 ? 'negc' : value > 0 ? 'pos' : ''}">${signed1(value)}</b></span>`;
+  const seaDetails = (label, causes) => causes.length ? `<div class="sec">${label}变化的原因（百分点）</div><table class="tight">${causes.map(([name, x]) => `<tr><td>${name}</td><td class="${x < 0 ? 'negc' : 'pos'}">${signed1(x*100)}</td></tr>`).join('')}</table>` : '';
   const icoN = { bad: 'warn', good: 'good', info: 'info' };
   $('village').classList.add('modal'); coins.forEach(c => c.t = Math.max(c.t, 2));
-  $('vReport').innerHTML = `<div class="kicker">${seasonName(V.season)} · 季度报告</div>
-    <h3>${r.moneyDelta >= 0 && r.dMor >= 0 ? '不错的一季' : r.moneyDelta < 0 && r.dMor < 0 ? '艰难的一季' : '有得有失的一季'}</h3>
+  setGameHTML($('vReport'), `<div class="kicker">${seasonName(V.season)} · 季度报告</div>
+    <h3>${cashTitle} · ${seaTitle}</h3>
     <div class="tiles">
-      <div><small>${ic('coin')}村库</small><b>${Math.round(V.money)}</b><em class="${r.moneyDelta < 0 ? 'negc' : 'pos'}">${fmt(r.moneyDelta)}</em></div>
-      <div><small>${ic('heart')}民心</small><b>${Math.round(V.morale)}</b><em class="${r.dMor < 0 ? 'negc' : 'pos'}">${fmt(r.dMor)}</em></div>
-      <div><small>${ic('wave')}海洋</small><div class="oc"><span>珊瑚</span>${trend(r.coralBefore, eco.coral)}<b>${pct(eco.coral)}</b></div><div class="oc"><span>鱼群</span>${trend(r.fishBefore, eco.fish)}<b>${pct(eco.fish)}</b></div><div class="oc"><span>水质</span>${trend(r.clarBefore, eco.clar)}<b>${pct(eco.clar)}</b></div>${V.harbor || (eco.pelagic ?? 1) < 0.98 ? `<div class="oc"><span>远洋</span>${trend(r.pelBefore ?? 1, eco.pelagic ?? 1)}<b>${pct(eco.pelagic ?? 1)}</b></div>` : ''}</div>
+      <div><small>${ic('coin')}村库 · 季初 → 季末</small><b>${cash.start} → ${cash.end}</b><em class="${cash.net < 0 ? 'negc' : 'pos'}">净变化 ${signed1(cash.net)}</em></div>
+      <div><small>${ic('heart')}民心</small><b>${V.morale - r.dMor} → ${V.morale}</b><em class="${r.dMor < 0 ? 'negc' : 'pos'}">${signed1(r.dMor)}</em></div>
     </div>
-    <div class="vledger">${ic('coin')} 村库本季 <b class="${r.moneyDelta < 0 ? 'negc' : 'pos'}">${fmt(r.moneyDelta)}</b> ＝ 税 <b class="pos">+${Math.round(r.tax)}</b>${r.fee > 0.5 ? ` · 门票 <b class="pos">+${Math.round(r.fee)}</b>` : ''}${r.grant > 0.5 ? ` · 保护资助 <b class="pos">+${Math.round(r.grant - r.wages)}</b>` : ''}${r.pub.map(([l, x]) => ` · ${l} <b class="negc">−${Math.round(x)}</b>`).join('')}${r.sold < 0.3 && r.tourInc < 1 ? '<br><small>渔获几乎都被村民吃掉了。税只对卖出去的鱼和旅游收入抽成。</small>' : ''}</div>
+    <div class="vledger">${moneyPart('经营结余', cash.operating)}${moneyPart('建设与升级', cash.building)}${moneyPart('事件收支', cash.events)}</div>
+    <table class="sea-report"><caption>全海域海况</caption><thead><tr><th>指标</th><th>季初 → 季末</th><th>变化（百分点）</th><th>主要影响</th></tr></thead><tbody>
+      ${r.ocean.map((m, i) => `<tr data-metric="${m.key}"><th scope="row">${m.label}${m.goal != null ? `<small class="${m.end <= m.goal ? 'negc' : ''}">目标 &gt;${Math.round(m.goal*100)}%${m.end <= m.goal ? ' · 未过线' : ''}</small>` : ''}</th>
+        <td>${r1(m.start*100)}% → ${r1(m.end*100)}%</td><td class="${changes[i] < 0 ? 'negc' : changes[i] > 0 ? 'pos' : ''}">${signed1(changes[i])}</td><td>${m.cause}</td></tr>`).join('')}
+    </tbody></table>
+    ${bayReportHTML(r)}
     ${notes.length ? '<ul class="notes">' + notes.map(([k, n]) => `<li class="${k}">${ic(icoN[k])}<span>${n}</span></li>`).join('') + '</ul>' : ''}
-    <details><summary>收支明细 ▾</summary>
+    <details><summary>收支与海况明细 ▾</summary>
     <div class="sec">村民收入</div>
     <table class="tight"><tr><td>卖鱼 ${r.sold.toFixed(1)} 吨 × ${r.fishPrice.toFixed(0)}${r.haul > 0 ? ' · 含拖网' : ''}</td><td class="pos">${fmt(r.fishInc)}</td></tr>
     <tr><td>旅游 · ${Math.round(r.visitors)} 位潜水客${r.whaleVis > 0.5 ? ` · ${Math.round(r.whaleVis)} 位观鲸客` : ''}</td><td class="pos">${fmt(r.tourInc)}</td></tr>
     ${r.offCatch > 0.05 ? `<tr><td>其中远洋渔获 ${r.offCatch.toFixed(1)} 吨</td><td></td></tr>` : ''}
-    ${r.resInc > 0.5 ? '' : ''}
     <tr><td>上交村库 · ${Math.round(TAX[V.pol.tax]*100)}%</td><td class="negc">${fmt(-r.tax)}</td></tr>
     ${r.wages > 0.5 ? `<tr><td>修复礁区的工资</td><td class="pos">${fmt(r.wages)}</td></tr>` : ''}
     <tr><td>船和店的成本</td><td class="negc">${fmt(-r.privCost)}</td></tr>
     <tr class="tot"><td>村民到手 · 人均生活 ${r.perCap.toFixed(1)}</td><td>${fmt(r.earn)}</td></tr></table>
     <div class="sec">村库</div>
-    <table class="tight"><tr><td>税收 · ${Math.round(TAX[V.pol.tax]*100)}%</td><td class="pos">${fmt(r.tax)}</td></tr>
-    ${r.fee > 0.5 ? `<tr><td>游客门票</td><td class="pos">${fmt(r.fee)}</td></tr>` : ''}
-    ${r.grant > 0.5 ? `<tr><td>海洋保护资助（扣除发给村民的工资）</td><td class="pos">${fmt(r.grant - r.wages)}</td></tr>` : ''}
-    ${r.resInc > 0.5 ? `<tr><td>研究站科研经费</td><td class="pos">${fmt(r.resInc)}</td></tr>` : ''}
-    ${r.pub.map(([l, x]) => `<tr><td>${l}</td><td class="negc">${fmt(-x)}</td></tr>`).join('')}
-    ${r.buildSpent ? `<tr><td>本季建设（开季前已付）</td><td class="negc">${fmt(-r.buildSpent)}</td></tr>` : ''}
-    <tr class="tot"><td>村库余额</td><td>${Math.round(V.money)}</td></tr></table>
-    ${r.coralWhy && r.coralWhy.length ? `<div class="sec">珊瑚变化的原因</div><table class="tight">${r.coralWhy.map(([l, x]) => `<tr><td>${l}</td><td class="${x < 0 ? 'negc' : 'pos'}">${x < 0 ? '−' : '+'}${Math.abs(x*100).toFixed(1)}%</td></tr>`).join('')}</table>` : ''}
+    <table class="tight"><tr><td>季初村库</td><td>${cash.start}</td></tr>
+    <tr><td>税收 · ${Math.round(TAX[V.pol.tax]*100)}%</td><td class="pos">${signed1(r.tax)}</td></tr>
+    ${r1(r.fee) ? `<tr><td>游客门票</td><td class="pos">${signed1(r.fee)}</td></tr>` : ''}
+    ${r1(r.grant - r.wages) ? `<tr><td>海洋保护资助（扣除发给村民的工资）</td><td class="pos">${signed1(r.grant - r.wages)}</td></tr>` : ''}
+    ${r.resInc ? `<tr><td>研究站科研经费</td><td class="pos">${signed1(r.resInc)}</td></tr>` : ''}
+    ${r.pub.map(([l, x]) => `<tr><td>${l}</td><td class="negc">${signed1(-x)}</td></tr>`).join('')}
+    ${r.buildSpent ? `<tr><td>本季建设与升级</td><td class="negc">${fmt(-r.buildSpent)}</td></tr>` : ''}
+    ${cash.events ? `<tr><td>规划与水下事件收支</td><td class="${cash.events < 0 ? 'negc' : 'pos'}">${signed1(cash.events)}</td></tr>` : ''}
+    <tr class="tot"><td>季末村库</td><td>${cash.end}</td></tr></table>
+    ${seaDetails('珊瑚', r.coralWhy)}${seaDetails('鱼群', r.fishWhy)}
     <div class="sec">民心变化的原因</div>
     <table class="tight">${r.morale.map(([l, x]) => `<tr><td>${l}</td><td class="${x < 0 ? 'negc' : 'pos'}">${fmt(x)}</td></tr>`).join('') || '<tr><td>平平淡淡</td><td>0</td></tr>'}</table>
     </details>
-    <div class="btns"><button id="rDive">${ic('mask')}潜下去看看</button><button id="rNext" class="primary">${over ? '看看结局' : '下一季 ▸'}</button></div>`;
+    <div class="btns">${over ? '' : `<button id="rDive">${ic('mask')}提前调查下一季</button>`}<button id="rNext" class="primary">${over ? '看看结局' : '下一季 ▸'}</button></div>`);
   $('vReport').classList.add('on');
-  $('rDive').onclick = () => { $('village').classList.remove('modal'); diveInto(diveMark, 'free'); };
+  $('vReport').scrollTop = 0;
+  if(!over) $('rDive').onclick = () => { $('village').classList.remove('modal'); diveInto(diveMark, 'free'); };
   $('rNext').onclick = nextSeason;
   renderVillageUI();
 }
@@ -363,7 +454,8 @@ const isGameOver = () => V.season + 1 >= SEASONS_PER_GAME || V.money < -100 || V
 function nextSeason(){
   $('vReport').classList.remove('on'); $('village').classList.remove('modal');
   if(isGameOver()) return endGame();
-  V.season++; V.planStart = V.money; setState('plan');
+  V.season++; setState('plan');
+  if(V.sea?.season===V.season && V.sea.bayFinding){vTab='pol';$('vBody').scrollTop=0;}
   const note = () => toast(seasonName(V.season), SEASON_FX[V.season % 4].note, 6000);
   const ev = rollEvent();
   if(ev) showEvent(ev, note); else { renderVillageUI(); note(); }
@@ -372,19 +464,25 @@ function nextSeason(){
 function chartSVG(rows){
   const W = 520, Hc = 120, n = rows.length, bw = W/n;
   const max = Math.max(40, ...rows.map(r => Math.max(r.fishing + r.tour, r.cost)));
-  let s = `<svg viewBox="0 0 ${W} ${Hc + 20}" width="100%" role="img" aria-label="渔村每季收入">`;
+  const english=GameLocale.language==='en';
+  let s = `<svg viewBox="0 0 ${W} ${Hc + (english ? 34 : 20)}" width="100%" role="img" aria-label="渔村每季收入">`;
   rows.forEach((r, i) => {
     const x = i*bw + bw*0.22, w = bw*0.56, hf = r.fishing/max*Hc, ht = r.tour/max*Hc, hc = r.cost/max*Hc;
     s += `<rect x="${x.toFixed(1)}" y="${(Hc - hf).toFixed(1)}" width="${w.toFixed(1)}" height="${hf.toFixed(1)}" fill="#7ff3e4" rx="2"/>`;
     s += `<rect x="${x.toFixed(1)}" y="${(Hc - hf - ht).toFixed(1)}" width="${w.toFixed(1)}" height="${ht.toFixed(1)}" fill="#ffc48a" rx="2"/>`;
     s += `<line x1="${(x - 4).toFixed(1)}" x2="${(x + w + 4).toFixed(1)}" y1="${(Hc - hc).toFixed(1)}" y2="${(Hc - hc).toFixed(1)}" stroke="#ff8a7a" stroke-width="2"/>`;
-    s += `<text x="${(x + w/2).toFixed(1)}" y="${Hc + 15}" fill="#cfeff2" font-size="10" text-anchor="middle" font-family="Inter,Noto Sans SC,sans-serif">${['春', '夏', '秋', '冬'][i % 4]}${Math.floor(i/4) + 1}</text>`;
+    const label=english?'Q'+(i%4+1):['春','夏','秋','冬'][i%4]+(Math.floor(i/4)+1);
+    s += `<text x="${(x + w/2).toFixed(1)}" y="${Hc + 15}" fill="#cfeff2" font-size="10" text-anchor="middle" font-family="Inter,Noto Sans SC,sans-serif"><title>${seasonName(i)}</title>${label}</text>`;
+    if(english && i%4===0){
+      const centre=(i+Math.min(n-i,4)/2)*bw;
+      s+=`<text x="${centre}" y="${Hc+30}" fill="#cfeff2" font-size="10" text-anchor="middle">Year ${Math.floor(i/4)+1}</text>`;
+    }
   });
   return s + '</svg>';
 }
 function endGame(){
   setState('over');
-  const oceanOK = eco.fish > 0.55 && eco.coral > 0.55 && (eco.pelagic ?? 1) > OFF.okLine, grew = devTier(V) >= 1 && V.pop >= 20, villageOK = V.morale >= 50 && V.money >= 0 && grew;
+  const oceanOK = OCEAN_METRICS.every(m => m.goal == null || (eco[m.key] ?? 1) > m.goal), grew = devTier(V) >= 1 && V.pop >= 20, villageOK = V.morale >= 50 && V.money >= 0 && grew;
   endingKind = oceanOK ? 'good' : eco.fish > 0.33 ? 'mid' : 'bad';
   const T = V.morale <= 5 ? ['村民散了。', '没有人愿意再为这个村子出力。海还在，人心先空了。']
     : V.money < -100 ? ['村子破产了。', '村库空了，公共的事再没人管得动。']
@@ -394,11 +492,12 @@ function endGame(){
     : oceanOK ? ['珊瑚礁活下来了，村子却勉强度日。', '健康的海洋还不能自己付账单。至少现在还不能。']
     : villageOK ? ['村子富了。只富了一次。', '钱是从礁区里捞出来的，每一季都比上一季少一点。']
     : ['珊瑚礁安静了。', '没有人选择这个结局。它是被一个又一个「合理」的季节决定的。'];
-  $('endTitle').textContent = T[0]; archiveRun(T[0]);
-  $('endText').innerHTML = `${T[1]}<br><small style="font-style:normal;opacity:.75">村库 ${Math.round(V.money)} · 民心 ${Math.round(V.morale)} · 村民 ${V.pop} · 鱼群 ${Math.round(eco.fish*100)}% · 珊瑚 ${Math.round(eco.coral*100)}%</small>`;
-  $('chart').innerHTML = chartSVG(V.history);
-  $('chartCap').innerHTML = '每一季村民的收入：<b class="cf">渔获</b>与<b class="ct">旅游</b>。红线是船、店和公共开支的总和。';
-  $('swimOn').textContent = '去看看海底';
+  $('endTitle').textContent = gameText(T[0]); archiveRun(T[0]);
+  setGameHTML($('endText'), `${T[1]}<br><small style="font-style:normal;opacity:.75">村库 ${Math.round(V.money)} · 民心 ${Math.round(V.morale)} · 村民 ${V.pop} · 鱼群 ${Math.round(eco.fish*100)}% · 珊瑚 ${Math.round(eco.coral*100)}%</small>`);
+  setGameHTML($('chart'), chartSVG(V.history));
+  if(V.bay?.ending) $('endText').append(document.createElement('br'), document.createTextNode(gameText(V.bay.ending)));
+  setGameHTML($('chartCap'), '每一季村民的收入： <b class="cf">渔获</b> 与 <b class="ct">旅游</b>。红线是船、店和公共开支的总和。');
+  $('swimOn').textContent = gameText('去看看海底');
   $('ending').classList.add('on'); $('village').classList.add('over'); renderVillageUI();
 }
 $('swimOn').addEventListener('click', () => { $('ending').classList.remove('on'); goDive('ending'); });
@@ -436,7 +535,6 @@ function netCatch(pool){
     const allowed = lerp(9.45, 1.35, Math.max(0, along)/27), lx = rx + dx*along, lz = rz + dz*along;
     if(lx*lx + ry*ry + lz*lz < allowed*allowed){ removeFish(pool, i); n++; }
   }
-  if(n) pool.geo.attributes.aSeed.needsUpdate = true;
   return n;
 }
 function updateTrawl(dt){
@@ -483,11 +581,12 @@ function cutNet(d){
 }
 function summonWhale(){ whale.visible = true; whaleT = 0; whaleC.copy(player.pos); whaleTh = player.yaw + 0.5; }
 function surfaceUp(){
-  if(mode !== 'dive' || rising) return;
+  if(mode !== 'dive' || rising || paused) return;
   if(state === 'freedive' || (state === 'ending' && stateT > 3)){
+    leaveBayEncounter();
     const back = state === 'ending' ? 'over' : returnTo, free = state === 'freedive';
     goVillage(() => { setState(back);
-      if(back === 'report') $('vReport').classList.add('on');
+      if(back === 'report'){ $('village').classList.add('modal'); $('vReport').classList.add('on'); }
       if(back === 'over') $('ending').classList.add('on');
       if(free && back !== 'over') seaDebrief(back); });
   }
@@ -563,11 +662,7 @@ function storyUpdate(dt){
         cue(7.5, () => toast('怎么玩', '建造、设定捕捞规则，然后开始本季。每一季，珊瑚礁都会给出回应。你随时可以潜下去看。', 9000)); })); }
   } else if(state === 'trawl') updateTrawl(dt);
   else if(state === 'running' && stateT > RUN){
-    const r = seasonStep();
-    if(r.fishInc > 0.5) coin(`+${Math.round(r.fishInc)}`, new THREE.Vector3(8, 4, 8));
-    if(r.tourInc > 0.5) coin(`+${Math.round(r.tourInc)}`, new THREE.Vector3(-18, 5, -1), '#1f8a8a');
-    coin(`村库 ${fmt(r.moneyDelta)}`, new THREE.Vector3(0, 8, -16), r.moneyDelta < 0 ? '#b8452f' : '#1d8a5a');
-    setState('tally'); renderVillageUI(); cue(2.0, () => { setState('report'); showReport(r); });
+    settleSeason(false);
   } else if(state === 'freedive'){
     const left = debris.filter(d => d.alive).length;
     objective(seaObjective(left) || (left ? `礁上缠着遗落的渔网，把它们割掉（还剩 ${left} 张）` : '游一游，看看你的村子做了什么。准备好了就浮上水面。'));

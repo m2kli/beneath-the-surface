@@ -42,7 +42,10 @@ const diveMark = { name: '蝠鲼', pos: baitMark.pos, av: null };
 const MARKS = [baitMark, { name: '绿海龟', pos: () => pC.copy(ENT.turtle.st.pos), av: { kind: 'turtle' } }, { name: '黑鳍礁鲨', pos: () => pC.copy(ENT.shark.st.pos), av: { kind: 'shark' } },
   { name: '海月水母', pos: () => pC.copy(ENT.jelly.st.pos), av: { kind: 'jelly' } }, { name: '蝠鲼', pos: () => pC.copy(ENT.manta.st.pos), av: { kind: 'manta' } }];
 SCHOOLS.forEach((S, i) => { if(['roam', 'hunt', 'hover', 'graze'].includes(S.kind)) MARKS.push({ name: SPECIES_NAME[S.species] + '群', pos: () => pC.set(S.x, S.y0, S.z), av: { kind: 'school', sc: i, name: SPECIES_NAME[S.species] + '群' } }); });
-MARKS.forEach(m => { const el = document.createElement('div'); el.className = 'mk'; el.innerHTML = `<span>点击化身 · ${m.name}</span>`; $('marks').appendChild(el); m.el = el; m.sx = 0; m.sy = 0; m.vis = false; });
+MARKS.forEach(m => { const el = document.createElement('div'); el.className = 'mk'; setGameHTML(el, `<span>点击化身 · ${m.name}</span>`); $('marks').appendChild(el); m.el = el; m.sx = 0; m.sy = 0; m.vis = false; });
+document.addEventListener('ocean-language-changed', () => {
+  for(const mark of MARKS) mark.el.querySelector('span').textContent=gameText('点击化身 · '+mark.name);
+});
 let mouseVX = -1e4, mouseVY = -1e4, downX = 0, downY = 0, hotMark = null;
 renderer.domElement.addEventListener('pointermove', e => { mouseVX = e.clientX; mouseVY = e.clientY; });
 renderer.domElement.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
@@ -75,6 +78,7 @@ const PICK = [];   // { groups: () => [..], k, i, pos }
   dBoats.filter(b => b.role !== 'tour').forEach(b => PICK.push({ k: b.role === 'line' ? 'boat' : 'trawler', i: b.idx, groups: () => [b.g], pos: b.home, ship: true }));
 }
 const pickOwner = new Map(); for(const p of PICK) for(const g of p.groups()) if(!pickOwner.has(g)) pickOwner.set(g, p);
+raycaster.layers.enable(BOAT_PICK_LAYER);
 function pickBuilding(x, y){
   ndc.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); raycaster.setFromCamera(ndc, dioCam);
   const live = []; for(const [g] of pickOwner) if(g.visible && g.scale.x > 0.5) live.push(g);
@@ -115,13 +119,13 @@ function renderFocus(){
   const multi = (b.max > 1 || p.k === 'offshore' || p.k === 'whale');
   const extra = { house: `全村能住 ${W(V, 'house', [4, 6, 8])} 人，现在住着 ${V.pop} 人。`, offshore: `远洋鱼群 ${Math.round((eco.pelagic ?? 1)*100)}%。`, whale: `远洋鱼群 ${Math.round((eco.pelagic ?? 1)*100)}%，越健康游客越多。`,
     harbor: `现在停着 ${V.offshore || 0} 条远洋渔船、${V.whale || 0} 条观鲸船。`, nursery: `珊瑚 ${Math.round(eco.coral*100)}%。`, shop: `本季潜水客由所有潜水店一起接待。` }[p.k] || '';
-  $('bInfo').innerHTML = `<button class="bx" aria-label="关闭">✕</button>
+  setGameHTML($('bInfo'), `<button class="bx" aria-label="关闭">✕</button>
     <div class="bh">${ic(info.icon)}<b>${b.name}${multi ? ` <small>#${p.i + 1}</small>` : ''}</b><span class="lvp">${Array.from({ length: mx }, (_, j) => `<i class="${j < lv ? 'on' : ''}"></i>`).join('')}</span><span class="lvn">Lv ${lv}</span></div>
     <div class="bnow">${LV_TXT[p.k][lv - 1]}</div>
     ${lv < mx ? `<div class="bnext">${ic('up')}<span>升到 Lv ${lv + 1}：${LV_TXT[p.k][lv]}</span></div>` : ''}
     ${extra ? `<div class="bextra">${extra}</div>` : ''}
     <div class="bbtns">${lv < mx ? `<button class="sb primary" id="bUp" ${why ? 'disabled' : ''}>${ic('up')}升级 · ${ic('coin')}${c}</button>` : ''}${ups ? `<button class="sb ghost" id="bUndo">撤销本季升级</button>` : ''}</div>
-    ${why && lv < mx ? `<div class="bwhy">${why}</div>` : ''}`;
+    ${why && lv < mx ? `<div class="bwhy">${why}</div>` : ''}`);
   $('bInfo').classList.add('on');
   $('bInfo').querySelector('.bx').onclick = exitFocus;
   const up = $('bUp');
@@ -135,15 +139,15 @@ function updateHoverPick(){
   const p = underUI(mouseVX, mouseVY) ? null : pickBuilding(mouseVX, mouseVY);
   const key = p ? p.k + p.i + ':' + lvOf(V, p.k, p.i) : '';
   if(p !== hoverPick || key !== hoverT){ hoverPick = p; hoverT = key;
-    if(p){ const b = BUILD.find(x => x.k === p.k); $('bTag').innerHTML = `${b.name} · Lv ${lvOf(V, p.k, p.i)}<small>${focusOn === p ? '在左下角的卡片里升级' : '点击查看、升级'}</small>`; $('bTag').classList.add('on'); }
+    if(p){ const b = BUILD.find(x => x.k === p.k); setGameHTML($('bTag'), `${b.name} · Lv ${lvOf(V, p.k, p.i)}<small>${focusOn === p ? '在左下角的卡片里升级' : '点击查看、升级'}</small>`); $('bTag').classList.add('on'); }
     else $('bTag').classList.remove('on'); }
-  if(p) $('bTag').style.transform = `translate(${mouseVX + 16}px, ${mouseVY + 14}px)`;
+  if(p){ const tag=$('bTag'); tag.style.transform=`translate(${Math.min(mouseVX+16,innerWidth-tag.offsetWidth-6)}px, ${Math.min(mouseVY+14,innerHeight-tag.offsetHeight-6)}px)`; }
   renderer.domElement.style.cursor = p ? 'pointer' : '';
 }
 
 // screen rectangles covered by the interface: world markers never show (or take the hover) underneath them
 let uiRects = [], uiRectT = 0;
-const UI_IDS = ['hud', 'vTop', 'vSide', 'vClock', 'vBottom', 'vEvent', 'vPrompt', 'vReport', 'montage', 'bInfo', 'sysBtn', 'coach', 'toast'];
+const UI_IDS = ['hud', 'vTop', 'vSide', 'vClock', 'vBottom', 'shorePanels', 'vEvent', 'vPrompt', 'vReport', 'montage', 'bInfo', 'sysBtn', 'coach', 'toast'];
 function underUI(x, y){
   if(time - uiRectT > 0.25){ uiRectT = time; uiRects = [];
     for(const id of UI_IDS){ const el = $(id); if(!el) continue; const cs = getComputedStyle(el); if(cs.display === 'none' || +cs.opacity < 0.1 || cs.visibility === 'hidden') continue;
@@ -183,6 +187,7 @@ function updateMarks(){
 }
 function diveInto(m, kind){
   if(zoom || mode !== 'village') return;
+  if($('coach').classList.contains('on') && COACH[coachI]?.sel === '#vDive') showCoach(coachI + 1);
   const sp = pB.copy(m.pos()).project(camera);
   const hit = portalVisibleAt((sp.x*0.5 + 0.5)*innerWidth, (-sp.y*0.5 + 0.5)*innerHeight);
   const hp = hit ? hit.point.clone() : new THREE.Vector3(0, 0, 30);
@@ -191,6 +196,7 @@ function diveInto(m, kind){
   $('village').classList.add('zooming');
   zoom = { t: 0, kind, mark: m, cam0: dioCam.position.clone(), tgt0: controls.target.clone(), hit: hp };
   controls.enabled = false; controls.autoRotate = false;
+  if(kind === 'bay') queueBayPrograms();
 }
 function updateZoom(dt){
   zoom.t = Math.min(1, zoom.t + dt/2.2);
@@ -244,7 +250,8 @@ function enterDiveSeamless(z){
   const cp = Math.cos(player.pitch); player.fwd.set(Math.sin(player.yaw)*cp, Math.sin(player.pitch), Math.cos(player.yaw)*cp);
   $('avatarCard').classList.add('on'); showKeys();
   const want = Math.round(clamp(eco.ghost/0.25, 0, 4)); if(debris.filter(d => d.alive).length !== want) deployNets(want);
-  if(z.kind === 'trawl'){ setState('diveTrawl'); cue(1.5, startTrawl); } else { setState('freedive'); startSeaDive(); }
+  if(z.kind === 'trawl'){ setState('diveTrawl'); cue(1.5, startTrawl); } else { setState('freedive'); startSeaDive(z.kind==='bay'); }
+  if(z.kind === 'bay') startBayEncounter();
   diveIntroT = 0;
 }
 let wakeT = 0, diveIntroT = 99, camYawOff = 0, camPitch = -0.05, aimYaw = 0, swapT = 9;
@@ -284,6 +291,8 @@ function oceanLook(dt, fromShore){
 }
 // ---- everything alive down there, whether or not you are
 function simulateOcean(dt, ctrl){
+  if(!bayWorld && (V.bay?.route || V.bay?.racks?.length || V.bay?.outpost)) bayWorld=createBayWorld();
+  syncBayLandmarks();
   updateCreatures(dt); updateBenthos(dt); updatePelagic(dt);
   const t0 = performance.now();
   if(!noRespawn){
@@ -293,7 +302,7 @@ function simulateOcean(dt, ctrl){
     for(let k=0; k<25 && reg.active > wantR; k++) reg.active--;
     for(let k=0; k<25 && bait.active > wantB; k++) bait.active--;
   }
-  reg.geo.instanceCount = reg.active; bait.geo.instanceCount = bait.active;
+  bait.mesh.visible = true;
   updateSchools(time); updateFish(reg, dt); updateFish(bait, dt);
   perf.fishMs = lerp(perf.fishMs, performance.now() - t0, 0.1);
   updateSea(dt, ctrl);
@@ -323,13 +332,27 @@ function placeOceanCamera(){
   sky.position.copy(camera.position); surface.position.x = camera.position.x; surface.position.z = camera.position.z;
 }
 
+function updateDiveObservations(){
+  let closest = 0, distance = Infinity;
+  for(let i = 0; i < PATCHES.length; i++){
+    const dx = player.pos.x - PATCHES[i].x, dz = player.pos.z - PATCHES[i].z;
+    const squared = dx*dx + dz*dz;
+    if(squared < distance){ closest = i; distance = squared; }
+  }
+  const reef = Math.round(patchLife[closest]*100) + '%';
+  const fish = Math.round(100*(reg.active + bait.active)/(NR + NB)) + '%';
+  if($('localReef').textContent !== reef) $('localReef').textContent = reef;
+  if($('localFish').textContent !== fish) $('localFish').textContent = fish;
+}
 function frame(){
   const f0 = performance.now();
-  const dt0 = forcedDt || Math.min(clock.getDelta(), 0.05), dt = paused ? 0 : dt0; time += dt; stateT += dt;
+  const rawDt = forcedDt || clock.getDelta();
+  if(paused && !worldNeedsRedraw){ perf.ms = 0; perf.fishMs = 0; return; }
+  const dt = paused ? 0 : (forcedDt || Math.min(rawDt, 0.05)); time += dt; stateT += dt;
   storyUpdate(dt);
+  setW('mCoral', eco.coral); setW('mFish', eco.fish); setW('mWater', eco.clar); setW('mPel', eco.pelagic ?? 1);
 
   if(mode === 'village'){
-    setW('mCoral', eco.coral); setW('mFish', eco.fish); setW('mWater', eco.clar); setW('mPel', eco.pelagic ?? 1);
     updateDiorama(dt);
     if(zoom) updateZoom(dt); else if(unzoom) updateUnzoom(dt); else if(focusAnim) updateFocus(dt); else controls.update();
     if((window.__hpN = (window.__hpN || 0) + 1) % 3 === 0) updateHoverPick();
@@ -340,11 +363,13 @@ function frame(){
       syncPortalCamera();
       simulateOcean(dt, false);
       setShadowExtent(132); updateShadowCam(pB.set(0, 20, -87));
-      composer.renderToScreen = false; renderFrame();
+      composer.renderToScreen = false; renderFrame(true);
       portalU.tPortal.value = composer.readBuffer.texture;
       renderer.getDrawingBufferSize(drawSize); portalU.uRes.value.copy(drawSize);
+      syncFleetInstances();
       renderer.setRenderTarget(null); renderer.render(dio, dioCam);
       updateMarks(); updateSeaMarks();
+      worldNeedsRedraw = false;
       perf.ms = lerp(perf.ms, performance.now() - f0, 0.1);
       return;
     }
@@ -353,7 +378,13 @@ function frame(){
   U.uPortal.value = 0; camera.near = 0.3; camera.far = 900; camera.clearViewOffset(); setShadowExtent(62); diveIntroT += dt;
   for(const m of MARKS) if(m.vis){ m.vis = false; m.el.classList.remove('on', 'hot'); }
   oceanLook(dt, false);
-  setW('mCoral', patchLife[13]); setW('mFish', (reg.active + bait.active) / (NR + NB)); setW('mWater', vis.clar); setW('mPel', eco.pelagic ?? 1);
+  updateDiveObservations();
+  if(baySession && state === 'freedive'){
+    updateBayFrame(dt);
+    worldNeedsRedraw = false;
+    return;
+  }
+  updateBayInvite();
 
   // --- you, whatever you are right now: the mouse steers (left/right turns, up/down climbs and dives), W/S throttle, A/D also turn
   const ctrl = state !== 'intro' && state !== 'surfacing';
@@ -429,7 +460,7 @@ function frame(){
     ptr.style.transform = `translate(${(sx*0.5 + 0.5)*innerWidth}px, ${(-sy*0.5 + 0.5)*innerHeight}px)`;
     $('ptrArrow').style.display = on ? 'none' : 'block'; $('ptrRing').style.display = on ? 'block' : 'none';
     $('ptrArrow').style.transform = `rotate(${Math.atan2(sx*innerWidth, sy*innerHeight)}rad)`;
-    $('ptrDist').textContent = `${tgtName} · ${Math.round(nd)} m`;
+    $('ptrDist').textContent = gameText(`${tgtName} · ${Math.round(nd)} m`);
     ptr.classList.toggle('poi', poi); ptr.classList.add('on');
   } else ptr.classList.remove('on');
 
@@ -437,16 +468,15 @@ function frame(){
   if(rising) updateRising(dt); else updateSwap();
   tmp.copy(player.pos).addScaledVector(camDir.set(player.fwd.x, 0, player.fwd.z).normalize(), 22);
   updateShadowCam(tmp);
-  renderFrame();
+  renderFrame(false);
+  worldNeedsRedraw = false;
   perf.ms = lerp(perf.ms, performance.now() - f0, 0.1);
-  if(!forcedDt && dt < 0.049){
-    perf.dt = lerp(perf.dt || 0.016, dt, 0.05);
-    if(time - (perf.lastAdapt || 0) > 2.5 && time > 4){
-      if(perf.dt > 0.026 && Q.pr > 0.75){ Q.pr = Math.max(0.75, Q.pr - 0.25); resize(); perf.lastAdapt = time; }
-      else if(perf.dt < 0.0175 && Q.pr < Q.maxPr){ Q.pr = Math.min(Q.maxPr, Q.pr + 0.25); resize(); perf.lastAdapt = time; }
-    }
-  }
 }
 showVillageBackdrop();
 if(params.get('auto') || params.get('village')) start();
+// Queue the reef and island shaders together before the first draw asks the driver for each program.
+renderer.setRenderTarget(sceneRT);
+renderer.compile(scene, camera);
+renderer.setRenderTarget(null);
+renderer.compile(dio, dioCam);
 renderer.setAnimationLoop(frame);

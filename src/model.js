@@ -95,10 +95,109 @@ function seaView(S, b){
 }
 let pendingHaul = 0, vTab = 'pol';
 // One season of the village and the sea, as a pure function: used both to run the season and to preview it.
+// A dive records evidence in this season's sea. Only the accepted shore assignment uses a boat or guide.
+const BAY_JOBS = {
+  route: '派一艘普通船走外缘', moor: '移泊到沙底', tour: '开一个外缘观赏班', selective: '避开幼鱼混群',
+  winter: '去背风窝冬捕', tie: '留一艘船在港', shelter: '派船布设庇护架', quiet: '留一段安静水面',
+  lift: '派船回收整张网', gap: '只打开通道', extend: '将庇护架送往邻礁', teach: '交给渔户轮班',
+  stagger: '错开窄口船班', bridge: '连接两片栖地', whale: '安排一次远观', cancelWatch: '撤下一个观鲸班',
+  sample: '提交远洋样本', reclaim: '回收一座架调去邻礁', keep: '为原湾保留庇护', filter: '加开一班污水处理',
+  observe: '登记新清洁站', land: '按鱼讯安排最后一网', release: '把这一拨留给海湾', lastTour: '末班改到外湾'
+};
+function bayJobIds(v, f){
+  if(!f || !Number.isInteger(f.season) || f.season < 0 || f.season >= 16) return [];
+  const options = [
+    ['route'], ['moor','tour'], ['selective'], ['winter','tie'], ['shelter'], ['tour','quiet'],
+    f.sign === 'net' ? ['gap','lift'] : ['extend'], ['teach'], ['stagger','quiet'], ['quiet','tour'],
+    ['bridge','selective'], f.sign === 'whale' ? ['whale','sample'] : ['cancelWatch','sample'],
+    f.sign === 'independent' && v.bay?.racks?.length ? ['reclaim','keep'] : ['keep'],
+    f.sign === 'outfall' ? ['filter','observe'] : f.sign === 'boats' ? ['moor','observe'] : ['observe'],
+    f.sign === 'letgo' ? ['release'] : ['land','release'], f.sign==='dawn'?['quiet']:['lastTour','quiet']
+  ];
+  return options[f.season];
+}
+function bayJobBlock(job, v, e, finding){
+  if(!bayJobIds(v, finding).includes(job)) return '当前观察不支持这项安排';
+  if(['route','winter','selective','stagger','land'].includes(job)){
+    if(!v.boats) return '需要普通渔船';
+    if(v.pol.fish === 'ban' || (v.pol.fish === 'quota' && e.fish <= 0.42)) return '本季停捕';
+    if(job === 'selective' && finding.season === 10 && finding.quality < 0.55) return '尚未见到成鱼抵达外缘';
+  }
+  if(['shelter','extend','lift','gap','teach','moor','tie'].includes(job) && !v.boats) return '需要一艘村船';
+  if(['bridge','keep','reclaim'].includes(job) && !(v.boats||v.nursery)) return '需要村船或苗圃人员';
+  if(['tour','lastTour'].includes(job) && !v.shops) return '需要潜水店';
+  if(['tour','lastTour','whale','cancelWatch'].includes(job) && v.pol.tour === 'closed') return '本季关闭旅游';
+  if(['whale','cancelWatch'].includes(job) && !(v.harbor && v.whale)) return '需要渔港和观鲸船';
+  if(job === 'sample' && !v.research) return '需要海洋研究站';
+  if(job === 'filter' && v.money < 6) return '需要村库 6';
+  if(['lift','gap'].includes(job) && e.ghost < 0.125) return '遗网已清除';
+  return '';
+}
+function baySeasonWork(v, e){
+  const sea = v.sea?.season === v.season ? v.sea : null;
+  const f = (sea?.bayPlan && sea.bayApproved) || sea?.bayFinding;
+  const memory = v.bay || {};
+  const proposed = f?.season === v.season ? sea.bayPlan : '';
+  const job = proposed && !bayJobBlock(proposed, v, e, f) ? proposed : '';
+  const q = clamp(Number(f?.quality) || 0, 0, 1);
+  const next = { ...memory };
+  const work = { job, next, catchFactor: 1, tourShare: 0, whaleShare: 0, labor: 0, cost: 0, costsSaved: 0,
+    recruit: 0, recover: 0, bycatchRelief: 0, litterFactor: 1, wasteFactor: 1, sample: 0 };
+  if(job === 'route' || job === 'teach'){
+    next.route = Math.max(memory.route || 0, q); next.routeOn = true;
+    if(job === 'teach') next.trained = v.school ? 2 : 1;
+  }
+  if(next.routeOn && next.route) work.catchFactor += 0.2*next.route;
+  if(job === 'winter') work.catchFactor = 0.65 + q*0.8;
+  if(job === 'land') work.catchFactor = 0.45 + q*1.05;
+  if(job === 'selective' || job === 'stagger'){ work.catchFactor *= 0.75; work.bycatchRelief = 0.8*q; }
+  if(job === 'tie' || job === 'release'){ work.catchFactor = 0; work.costsSaved = 1; }
+  if(job === 'moor' || job === 'quiet'){ next.quiet = true; next.quietKnown = true; work.catchFactor *= 0.85; }
+  if(job === 'tour' || job === 'lastTour') { next.quiet = false; work.tourShare = 0.26*q; work.labor = 1; }
+  if(next.quiet){ work.tourShare -= 0.22; work.litterFactor = 0.82; }
+  if(job === 'whale') { work.whaleShare = 0.32*q; work.labor = 1; }
+  if(job === 'cancelWatch'){ work.whaleShare = -0.45; work.costsSaved = 1; }
+  if(job === 'sample' && !sea?.seen?.pel) work.sample = SEA.sample;
+  if(job === 'filter'){ work.cost = 6; work.wasteFactor = 0.68; }
+  if(job === 'lift' || job === 'gap'){
+    work.recover = Math.min(e.ghost, job === 'lift' ? 0.25 : 0.075);
+    work.catchFactor *= job === 'lift' ? 0 : 0.72; work.labor = job === 'lift' ? 1 : 0.3;
+  }
+  if(['shelter','extend','bridge','reclaim','keep'].includes(job)){
+    const isTrial = !memory.racks?.length;
+    if(job !== 'keep' || isTrial){
+      const points = (f.points || []).slice(0,2).map(p=>({x:clamp(p.x,-10,10), y:clamp(p.y,-4,4)}));
+      if(points.length){
+        if(job==='extend')next.outpost={...points.at(-1),outer:true};
+        else next.racks=points;
+      }
+      work.catchFactor *= job === 'reclaim' ? 0.8 : 0.4;
+      work.labor += v.nursery ? 0.35 : 1;
+    }
+    next.habitat = 0.35 + 0.65*q;
+    if(job === 'reclaim'){
+      next.natural=true; next.redeployed=true; next.racks=(next.racks||[]).slice(0,1);
+      if(!next.outpost)next.outpost={x:10,y:-1};
+    }
+  }
+  if(job === 'observe' || job === 'moor' || job === 'filter') next.station = f.sign;
+  if(next.routeOn && next.trained && v.pol.fish !== 'ban' && (v.pol.fish!=='quota'||e.fish>0.42) && v.boats){
+    work.labor -= next.trained > 1 && v.school ? 0.65 : 0.25;
+  }
+  const habitat = (next.racks?.length || next.outpost || next.natural) ? (next.habitat || 0.4) : 0;
+  work.labor += (next.racks?.length || 0)*(v.nursery ? 0.12 : 0.35);
+  if(next.outpost)work.labor+=v.nursery?0.05:0.15;
+  const shelter = habitat*(0.45 + 0.55*e.coral)*(next.quiet ? 1.2 : 1);
+  next.young = clamp((memory.young || 0)*0.72 + shelter*0.32 + (job === 'release' ? 0.16*q : 0), 0, 1);
+  work.recruit = (memory.young || 0)*(next.redeployed ? 0.015 : 0.012);
+  return work;
+}
 function simulateSeason(e0, v0, haul){
   const e = { ...e0 }, v = { ...v0, pol: { ...v0.pol } }, P = v.pol, sf = SEASON_FX[v.season % 4], M = v.mods || {};
   if(e.pelagic === undefined) e.pelagic = 1;
   const r = { morale: [], pub: [] }, n = k => v[KEY[k]] || 0, tier = devTier(v), Wl = (k, t) => W(v, k, t);
+  const bayWork = baySeasonWork(v, e);
+  if(v.bay || v.sea?.bayFinding) v.bay = bayWork.next;
   // hands
   const workK = { overtime: 1.25, normal: 1, festival: 0.8 }[P.work];
   const labor = v.pop*0.62*workK*(v.morale < 30 ? 0.8 : 1);
@@ -113,7 +212,7 @@ function simulateSeason(e0, v0, haul){
   const nursW = Wl('nursery', [1, 1.5, 2]), resLv = Wl('research', [1, 2, 3]);
   const protect = ({ none: 0, core: REC.core, wide: 1 }[P.zone] + REC.nurs*nursW)*(P.fish === 'industrial' ? 0 : 1)*(P.waste === 'dump' ? REC.dumpK : 1);
   const needBld = n('nursery')*2 + n('plant') + n('recycle') + n('cold') + n('school') + n('harbor')*2 + n('research')*2;
-  const need0 = needFish + needTour + needBld, staff = need0 > 0 ? Math.min(1, labor/need0) : 1;
+  const need0 = needFish + needTour + needBld + bayWork.labor, staff = need0 > 0 ? Math.min(1, labor/need0) : 1;
   // restoration takes only hands that would otherwise be idle, so it never starves the boats or the shops
   const restoreNeed = protect > 0 ? Math.min(Math.max(0, labor - need0), degraded*labor*(REC.jobs + REC.jobsN*n('nursery'))) : 0;
   const need = need0 + restoreNeed;
@@ -124,6 +223,10 @@ function simulateSeason(e0, v0, haul){
   const schoolLv = n('school') ? lvOf(v, 'school', 0) : 0;
   let reefCatch = effort*e.fish*(access + spill)*sf.catchK*3.0*(M.storm ? 0.7 : 1);
   if(P.fish === 'quota') reefCatch *= qK*[1, 1.12, 1.2, 1.28][schoolLv];
+  const regularEffort = (P.fish === 'ban' ? 0 : P.fish === 'line' ? 0.55 : 1)*boatW*staff;
+  const oneBoat = n('boat') && effort > 0 ? reefCatch*(regularEffort/effort)/n('boat') : 0;
+  const bayCatch = oneBoat*(bayWork.catchFactor - 1);
+  reefCatch += bayCatch;
   const reefDmg = P.fish === 'industrial' ? Wl('trawler', [0.035, 0.012])*staff*{ none: 1, core: 0.35, wide: 0.1 }[P.zone] : 0;
   const bycatch = { industrial: 0.3, quota: 0.08, line: 0.03, ban: 0 }[P.fish];
   const recLv = n('recycle') ? lvOf(v, 'recycle', 0) : 0;
@@ -136,19 +239,20 @@ function simulateSeason(e0, v0, haul){
   const attract = e.coral*e.clar*(0.35 + 0.65*e.fish);
   const tierK = 1 + 0.1*tier;
   const baseV = { open: shopW*14 + resW*30, limited: shopW*8 + resW*12, closed: 0 }[P.tour];
-  const visitors = baseV*sf.tour*staff*(0.5 + v.rep)*(M.bloom ? 0.5 : 1)*(P.zone === 'wide' ? 0.9 : 1)*tierK;
-  const whaleVis = P.tour === 'closed' ? 0 : whaleW*OFF.whaleV*e.pelagic*sf.tour*staff*(0.5 + v.rep)*tierK;
+  const bayGuests = n('shop') ? (P.tour === 'open' ? 14 : P.tour === 'limited' ? 8 : 0)*bayWork.tourShare : 0;
+  const visitors = Math.max(0,baseV + bayGuests)*sf.tour*staff*(0.5 + v.rep)*(M.bloom ? 0.5 : 1)*(P.zone === 'wide' ? 0.9 : 1)*tierK;
+  const whaleVis = P.tour === 'closed' ? 0 : Math.max(0,whaleW + bayWork.whaleShare)*OFF.whaleV*e.pelagic*sf.tour*staff*(0.5 + v.rep)*tierK;
   const price = P.tour === 'limited' ? 7*Math.pow(attract, 1.3)*[1, 1.15, 1.25, 1.35][schoolLv] : 3*(0.3 + attract);   // open: volume at a low price that holds up even on a damaged reef; limited: a premium that only a beautiful reef earns
   const whalePrice = OFF.whaleP*(0.4 + 0.6*e.pelagic);
   const tourInc = visitors*price + whaleVis*whalePrice;
   const diverK = n('shop') ? Wl('shop', [1, 0.65, 0.45])/n('shop') : 1;          // trained divers at the bigger dive centres break less coral
-  const trample = { open: 0.016, limited: REC.trampleL, closed: 0 }[P.tour]*visitors/10*diverK;
+  const trample = { open: 0.016, limited: REC.trampleL, closed: 0 }[P.tour]*visitors/10*diverK*bayWork.litterFactor;
   const allVis = visitors + whaleVis;
   const litter = allVis*(P.tour === 'open' ? 0.0016 : 0.0004);
   // waste
   const plantLv = n('plant') ? lvOf(v, 'plant', 0) : 0;
   const sewerK = [1, 1, 1, 0.75, 0.6][tier];                    // a bigger town lays proper sewers
-  const nutr = (Wl('resort', [0.4, 0.5, 0.52]) + v.pop*0.004*sewerK + litter)*{ dump: 1, basic: 0.4, full: 0.1 }[P.waste]*[1, 1, 0.8, 0.65][plantLv];
+  const nutr = (Wl('resort', [0.4, 0.5, 0.52]) + v.pop*0.004*sewerK + litter)*{ dump: 1, basic: 0.4, full: 0.1 }[P.waste]*[1, 1, 0.8, 0.65][plantLv]*bayWork.wasteFactor;
   const wasteCost = { dump: 0, basic: 3 + v.pop*0.08, full: 7 + v.pop*0.15 }[P.waste]*[1, 0.5, 0.4, 0.3][plantLv];
   // food store and the fish market
   const coldLv = n('cold') ? lvOf(v, 'cold', 0) : 0;
@@ -166,13 +270,14 @@ function simulateSeason(e0, v0, haul){
   const useT = baseV > 0 ? clamp(visitors/(baseV*0.6), 0.35, 1) : 0;
   const privCost = Wl('boat', [1, 1.2, 1.4])*{ industrial: 3, quota: 1 + 2*qK, line: 2, ban: 1 }[P.fish] + n('trawler')*{ industrial: 12, quota: 2 + 4*qK, line: 2, ban: 2 }[P.fish]
     + offW*{ industrial: 6, quota: 1.5 + 4.5*pelQ, line: 3, ban: 1.5 }[P.fish]
-    + (P.tour === 'closed' ? n('shop')*1.5 + n('resort')*5 + n('whale')*1 : (shopW*4 + resW*12)*useT + (n('shop')*1.5 + n('resort')*5)*(1 - useT) + whaleW*3);
+    + (P.tour === 'closed' ? n('shop')*1.5 + n('resort')*5 + n('whale')*1 : (shopW*4 + resW*12)*useT + (n('shop')*1.5 + n('resort')*5)*(1 - useT) + whaleW*3)
+    - (bayWork.job === 'cancelWatch' || oneBoat > 0 ? bayWork.costsSaved : 0);
   const gross = fishInc + tourInc;
   const tax = gross*TAX[P.tax];                                 // the treasury takes its share of every sale
   const fee = allVis*(P.tour === 'limited' ? 1.6 : 1.0);        // and an entry fee from every visitor
   const grant = REC.grant*degraded*protect*Math.min(1, staff + 0.2)*(1 + 0.25*resLv);   // conservation funding while the reef recovers
   const wages = grant*REC.wageShare;                            // most of it pays the villagers doing the work
-  const resInc = resLv*OFF.resInc*(e0.coral > 0.6 ? 1 : 0.5) + (v0.sea && resLv ? SEA.sample*SEA_KEYS.filter(k => v0.sea.seen[k]).length : 0);   // research money, more with a diver's samples
+  const resInc = resLv*OFF.resInc*(e0.coral > 0.6 ? 1 : 0.5) + (v0.sea && resLv ? SEA.sample*SEA_KEYS.filter(k => v0.sea.seen[k]).length : 0) + bayWork.sample;
   const earn = gross - tax - privCost + wages;                  // what households keep
   const perCap = (Math.max(0, earn) + eat*fishPrice*0.8)/Math.max(1, v.pop);   // what a household lives on, fish on the table included
   const pub = r.pub, add = (label, x) => { if(x > 0.05) pub.push([label, x]); };
@@ -181,6 +286,7 @@ function simulateSeason(e0, v0, haul){
   add('公共建筑维护', up('plant', 3) + up('recycle', 2) + up('cold', 2) + up('nursery', REC.nurseryUp) + up('school', 3) + up('harbor', 3) + up('research', 3));
   if(P.work === 'festival') add('节庆开支', 8);
   add('进口粮食', shortage*REC.food);
+  add('海湾排水处理', bayWork.cost);
   const pubTotal = pub.reduce((a, x) => a + x[1], 0);
   const income = tax + fee + grant - wages + resInc;
   const hungry = shortage > 0.05 && v.money + income < pubTotal;
@@ -211,9 +317,13 @@ function simulateSeason(e0, v0, haul){
   const K = 0.3 + 0.7*e.coral;
   const growth = 0.32*sf.spawn*e.fish*(1 - e.fish/K)*spawnHit + (P.zone !== 'none' ? 0.012 : 0);
   const fishBefore = e.fish, coralBefore = e.coral, clarBefore = e.clar, pelBefore = e.pelagic;
-  r.fishWhy = [['繁殖', growth], ['捕捞和误捕', -reefCatch*0.0059*(1 + bycatch)], ['幽灵网', -0.05*e.ghost], ['偷捕', -(M.poach || 0)]].filter(x => Math.abs(x[1]) >= 0.002);
-  e.fish = clamp(e.fish + growth - reefCatch*0.0059*(1 + bycatch) - 0.05*e.ghost - (M.poach || 0), 0.02, 1);
-  e.pelagic = clamp(e.pelagic + OFF.regrow*e.pelagic*(1 - e.pelagic)*(0.4 + 0.6*sf.spawn) - offCatch*OFF.deplete, 0.02, 1);
+  const relief = oneBoat*bayWork.catchFactor*bycatch*bayWork.bycatchRelief*0.0059;
+  e.ghost = Math.max(0, e.ghost - bayWork.recover);
+  r.fishWhy = [['繁殖', growth], ['捕捞和误捕', -reefCatch*0.0059*(1 + bycatch)], ['幽灵网', -0.05*e.ghost], ['偷捕', -(M.poach || 0)], ['外缘避捕幼鱼', relief], ['海湾育幼补充', bayWork.recruit]].filter(x => Math.abs(x[1]) >= 0.002);
+  const fishWithoutRecruit=e.fish+growth-reefCatch*0.0059*(1+bycatch)-0.05*e.ghost-(M.poach||0)+relief;
+  e.fish=clamp(fishWithoutRecruit+bayWork.recruit,0.02,1);
+  const pelGrowth = OFF.regrow*e.pelagic*(1 - e.pelagic)*(0.4 + 0.6*sf.spawn);
+  e.pelagic = clamp(e.pelagic + pelGrowth - offCatch*OFF.deplete, 0.02, 1);
   e.ghost = e.ghost*0.85 + lost;
   e.nutr = nutr;
   e.clar += (clamp(1 - 0.9*nutr - (M.bloom ? 0.25 : 0), 0.1, 1) - e.clar)*0.6;
@@ -236,8 +346,15 @@ function simulateSeason(e0, v0, haul){
     if(sea.tl) r.fishWhy.push(['垃圾', -SEA.trashK*sea.tl]);
     if(sea.E && sea.E.fish) r.fishWhy.push([sea.E.n, -sea.E.fish]); }
   r.sea = sea;
+  r.bayJob = bayWork.job;
+  r.bayRecovered = bayWork.recover/0.25;
+  if(v.bay && (v.bay.routeOn || v.bay.racks?.length || v.bay.quiet || v.bay.young || bayWork.recruit)){
+    const withoutRecruit=clamp(clamp(fishWithoutRecruit,0.02,1)+(sea?.dF||0),0.02,1);
+    r.bayRoutine = { catch:bayCatch, recruit:e.fish-withoutRecruit, racks:v.bay.racks?.length || 0, outpost:!!v.bay.outpost, trained:v.bay.trained || 0,
+      route:!!v.bay.routeOn, active:oneBoat>0 && bayWork.catchFactor>0, quiet:!!v.bay.quiet, redeployed:!!v.bay.redeployed };
+  }
   Object.assign(r, { labor, need, staff, catchT, reefCatch, offCatch, sold, spoiled, fishPrice, fishInc, haul: haul || 0, tourInc, visitors, whaleVis, allVis, privCost, earn, tax, fee, gross, perCap, resInc,
     pubTotal, moneyDelta: income - pubTotal, eat, reserve, stock0: v0.food, grant, wages, degraded, protect, restoreNeed, dMor, pop0, pop1: v.pop, cap, foodNeed, shortage, hungry, food: v.food, attract,
-    fishBefore, coralBefore, clarBefore, pelBefore, nutr, reefDmg, spawnHit, spring: v.season % 4 === 0 });
+    fishBefore, coralBefore, clarBefore, pelBefore, pelGrowth, nutr, reefDmg, spawnHit, spring: v.season % 4 === 0 });
   return { e, v, r };
 }

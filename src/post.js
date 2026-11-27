@@ -1,6 +1,23 @@
 'use strict';
 // ======================================================================= post: volumetric light shafts, composite, grade
 const FS_VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+// Two scalar fields cover the exact spatial periods of the primary and secondary moving caustics.
+// GPU storage is allocated on the first full-quality bay frame.
+const causticRT = new THREE.WebGLRenderTarget(CAUSTIC_TILE_SIZE, CAUSTIC_TILE_SIZE, {
+  format: THREE.RGFormat, type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+  depthBuffer: false,
+});
+const causticQuad = new FullScreenQuad(new THREE.ShaderMaterial({
+  uniforms: { uTime: U.uTime }, vertexShader: FS_VERT, depthTest: false, depthWrite: false,
+  fragmentShader: CAUSTIC_LAYER + `
+    uniform float uTime;
+    void main(){
+      vec2 p = min((gl_FragCoord.xy - 0.5) / ${CAUSTIC_TILE_SIZE - 1}.0, vec2(0.99999994));
+      float t = uTime * 0.42;
+      gl_FragColor = vec4(causticLayer(p, t), causticLayer(p, t * 1.13), 0.0, 1.0);
+    }`,
+}));
+U.uCausticTile.value = causticRT.texture;
 const volMat = new THREE.ShaderMaterial({
   defines: { STEPS: Q.steps },
   uniforms: { ...U, tDepth: { value: sceneRT.depthTexture }, uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() },
@@ -43,7 +60,7 @@ const volMat = new THREE.ShaderMaterial({
 });
 const volQuad = new FullScreenQuad(volMat);
 
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }));
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false }));
 const compositePass = new ShaderPass(new THREE.ShaderMaterial({
   uniforms: { tDiffuse: { value: null }, tScene: { value: sceneRT.texture }, tVol: { value: volRT.texture }, uVolTexel: { value: new THREE.Vector2() }, uTime: U.uTime, uDbg: { value: +(params.get('dbg') || 0) } },
   vertexShader: FS_VERT,
@@ -65,6 +82,8 @@ const compositePass = new ShaderPass(new THREE.ShaderMaterial({
 }));
 composer.addPass(compositePass);
 const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.6, 1.1);
+// Every bloom pass draws a screen-filling triangle and consumes only colour.
+for(const target of [bloom.renderTargetBright, ...bloom.renderTargetsHorizontal, ...bloom.renderTargetsVertical]) target.depthBuffer = false;
 composer.addPass(bloom);
 const finalPass = new ShaderPass(new THREE.ShaderMaterial({
   uniforms: { tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: U.uTime, uRes: { value: new THREE.Vector2() } },
@@ -88,14 +107,18 @@ const finalPass = new ShaderPass(new THREE.ShaderMaterial({
 }));
 composer.addPass(finalPass);
 
+const emptyVolume = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+emptyVolume.needsUpdate = true;
+let worldNeedsRedraw = true;
 function resize(){
-  const w = innerWidth, h = innerHeight, pr = Q.pr;
-  renderer.setPixelRatio(pr); renderer.setSize(w, h);
-  sceneRT.setSize(Math.floor(w*pr), Math.floor(h*pr));
-  volRT.setSize(Math.floor(w*pr/2), Math.floor(h*pr/2));
-  composer.setPixelRatio(pr); composer.setSize(w, h);
-  compositePass.uniforms.uVolTexel.value.set(1/(w*pr/2), 1/(h*pr/2));
-  finalPass.uniforms.uRes.value.set(w*pr, h*pr);
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  sceneRT.setSize(renderer.domElement.width, renderer.domElement.height);
+  volRT.setSize(Math.max(1, sceneRT.width >> 1), Math.max(1, sceneRT.height >> 1));
+  composer.setSize(w, h);
+  compositePass.uniforms.uVolTexel.value.set(1/volRT.width, 1/volRT.height);
+  finalPass.uniforms.uRes.value.set(sceneRT.width, sceneRT.height);
+  worldNeedsRedraw = true;
   camera.aspect = w/h; camera.updateProjectionMatrix();
   if(window.dioCam){ dioCam.aspect = w/h; window.dioOff = w > 900 ? Math.min(170, w*0.11) : 0; applyDioOffset(window.dioOffK ?? 1); }
 }
@@ -108,7 +131,42 @@ function applyDioOffset(k){
 }
 let SH = 62;
 const shadowCam = new THREE.OrthographicCamera(-SH, SH, SH, -SH, 1, 240);
-shadowCam.layers.set(1);
+shadowCam.layers.set(LIVE_SHADOW);
+// These reef instances have fixed transforms and silhouettes. Their original depth samples can be reused
+// while the light's world-to-clip matrix is identical. Moving casters still draw into the shadow map every frame.
+const fixedShadowRT = new THREE.WebGLRenderTarget(Q.shadow, Q.shadow, { format: THREE.RedFormat });
+fixedShadowRT.depthTexture = new THREE.DepthTexture(Q.shadow, Q.shadow, THREE.UnsignedIntType);
+const copyReefDepth = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  uniforms: { tFixed: { value: fixedShadowRT.depthTexture } },
+  vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: 'uniform sampler2D tFixed; void main(){ gl_FragDepth = texelFetch(tFixed, ivec2(gl_FragCoord.xy), 0).r; gl_FragColor = vec4(1.0); }',
+  colorWrite: false, depthFunc: THREE.AlwaysDepth,
+}));
+copyReefDepth.layers.set(LIVE_SHADOW); copyReefDepth.frustumCulled = false; copyReefDepth.renderOrder = -Infinity;
+copyReefDepth.visible = false; scene.add(copyReefDepth);
+const fixedShadowMatrix = new THREE.Matrix4(), previousShadowMatrix = new THREE.Matrix4();
+let bayProgramsQueued = false;
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  fixedShadowMatrix.elements.fill(NaN); bayProgramsQueued = false; worldNeedsRedraw = true;
+});
+// Start links together during the dive transition. First use would otherwise wait for each material in turn.
+function queueBayPrograms(){
+  if(LOW || bayProgramsQueued) return;
+  const materials = new Set(), previousTarget = renderer.getRenderTarget();
+  scene.traverse(object => {
+    const m = object.material;
+    if(m?.onBeforeRender === selectOceanProgram && !m.defines.BAY_VIEW) materials.add(m);
+  });
+  for(const m of materials) m.defines.BAY_VIEW = 1;
+  try {
+    renderer.setRenderTarget(sceneRT);
+    renderer.compile(scene, camera);
+    bayProgramsQueued = true;
+  } finally {
+    for(const m of materials){ delete m.defines.BAY_VIEW; m.needsUpdate = true; }
+    renderer.setRenderTarget(previousTarget);
+  }
+}
 const _r = new THREE.Vector3(), _u = new THREE.Vector3();
 function setShadowExtent(e){
   if(SH === e) return; SH = e;
@@ -123,16 +181,40 @@ function updateShadowCam(center){
   shadowCam.updateMatrixWorld();
   U.uShadowMat.value.multiplyMatrices(shadowCam.projectionMatrix, shadowCam.matrixWorldInverse);
 }
-function renderFrame(){
+function renderOceanShadow(){
+  prepareFishDraws(shadowCam, true);
   for(const c of casters) c[0].material = c[2];
+  const light = U.uShadowMat.value;
+  if(!fixedShadowMatrix.equals(light) && previousShadowMatrix.equals(light)){
+    shadowCam.layers.set(FIXED_REEF_SHADOW);
+    renderer.setRenderTarget(fixedShadowRT); renderer.render(scene, shadowCam);
+    fixedShadowMatrix.copy(light);
+  }
+  previousShadowMatrix.copy(light);
+  shadowCam.layers.set(LIVE_SHADOW);
+  copyReefDepth.visible = fixedShadowMatrix.equals(light);
+  if(!copyReefDepth.visible) shadowCam.layers.enable(FIXED_REEF_SHADOW);
   renderer.setRenderTarget(shadowRT); renderer.render(scene, shadowCam);
   for(const c of casters) c[0].material = c[1];
+}
+function renderFrame(fromShore, bayView = false){
+  bayRenderActive = bayView && !LOW;
+  if(bayRenderActive){
+    queueBayPrograms();
+    camera.layers.enable(BAY_DEPTH_LAYER);
+    renderer.setRenderTarget(causticRT); causticQuad.render(renderer);
+  } else camera.layers.disable(BAY_DEPTH_LAYER);
+  renderOceanShadow();
+  prepareFishDraws(camera, false);
   renderer.setRenderTarget(sceneRT); renderer.render(scene, camera);
-  volMat.uniforms.uProjInv.value.copy(camera.projectionMatrixInverse);
-  volMat.uniforms.uViewInv.value.copy(camera.matrixWorld);
-  volMat.uniforms.uCamPos.value.copy(camera.position);
-  volMat.uniforms.uFrame.value++;
-  renderer.setRenderTarget(volRT); volQuad.render(renderer);
+  compositePass.uniforms.tVol.value = fromShore ? emptyVolume : volRT.texture;
+  if(!fromShore){
+    volMat.uniforms.uProjInv.value.copy(camera.projectionMatrixInverse);
+    volMat.uniforms.uViewInv.value.copy(camera.matrixWorld);
+    volMat.uniforms.uCamPos.value.copy(camera.position);
+    volMat.uniforms.uFrame.value++;
+    renderer.setRenderTarget(volRT); volQuad.render(renderer);
+  }
   renderer.setRenderTarget(null);
   composer.render();
 }

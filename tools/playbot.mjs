@@ -28,6 +28,11 @@ export async function playGame(o = {}){
     if(cards.length > 1) issue(`${where}：同时打开了 ${cards.join('+')}`);
     if($('village').classList.contains('modal') && !cards.length && g.mode === 'village' && !['event'].includes(g.state)) issue(`${where}：遮罩开着但没有任何卡片（state=${g.state}）`);
     if(g.state === 'plan' && g.mode === 'village' && !cards.length && $('vRun').disabled) issue(`${where}：规划阶段“开始本季”是灰的`);
+    if(g.state === 'plan' && g.mode === 'village' && !cards.length && !g.zoom && !on('coach') && vis($('vDive'))){
+      const button = $('vDive'), rect = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width/2, rect.top + rect.height/2);
+      if(!button.contains(hit)) issue(`${where}：鼠标点不到“潜入海底”`);
+    }
     for(const id of ['vTop', 'vSide', 'vClock', 'hud', 'vBottom', ...cards, 'bInfo']){ const el = $(id); if(!vis(el)) continue; const r = rest(el);
       if(r.left < -2 || r.top < -2 || r.right > innerWidth + 2 || r.bottom > innerHeight + 2) issue(`${where}：#${id} 超出屏幕 (${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)} / ${innerWidth}x${innerHeight})`); }
     const e = (window.__errs || []).slice(errs0); if(e.length) issue(`${where}：报错 ${e[e.length - 1]}`);
@@ -38,6 +43,7 @@ export async function playGame(o = {}){
   await sleep(300);
   for(let i=0;i<6 && $('coach').classList.contains('on');i++){ $('coach').querySelector('button').click(); await sleep(30); }
   let bi = 0, dives = 0, seaDone = 0;
+  let openingMoney = g.V.planStart ?? g.V.money, openingSea = { ...(g.V.planOcean || g.eco) };
   for(let s=0; s<(o.seasons || 16); s++){
     if(g.state === 'over') break;
     await until(() => g.state === 'plan' || g.state === 'event', '规划或事件');
@@ -48,7 +54,7 @@ export async function playGame(o = {}){
     // build what the bot can afford, in order
     document.querySelector('#vTabs button[data-t="build"]')?.click();
     for(let k=0;k<3 && bi < BUILD_ORDER.length;k++){ const c = document.querySelector(`#vBuild button.bc[data-k="${BUILD_ORDER[bi]}"]`); if(!c){ bi++; continue; }
-      if(c.disabled){ if(/上限|渔港/.test(c.querySelector('.why')?.textContent || '')) bi++; break; } c.click(); bi++; await step(2); }
+      if(c.disabled){ if(/上限|渔港|capacity|limit|harbour/i.test(c.querySelector('.why')?.textContent || '')) bi++; break; } c.click(); bi++; await step(2); }
     document.querySelector('#vTabs button[data-t="pol"]')?.click();
     // now and then, focus a building and upgrade it through the card
     if(R() < 0.35 && window.PICK){ const owned = PICK.filter(p => (V[KEY[p.k]] || 0) > p.i && lvOf(V, p.k, p.i) < LVMAX[p.k]); const p = owned[Math.floor(R()*owned.length)];
@@ -58,8 +64,23 @@ export async function playGame(o = {}){
     if(!click($('vRun'), '开始本季')) break;
     await step(2);
     if(on('vPrompt')) click($('pStay'), '留在岸上');
+    if(g.state === 'running'){
+      const skip = $('skipMontage'), available = getComputedStyle(skip).display !== 'none';
+      if(available !== (g.V.season >= 4)) issue(`第${s + 1}季的快进按钮出现时机有误`);
+      if(available && s % 2 === 0){ click(skip, '直接看季报'); await step(); }
+    }
     await until(() => g.state === 'report', '季度报告', 4000);
     audit(`第${s + 1}季报告`);
+    const report = $('vReport'), cash = report.querySelector('.tiles b')?.textContent;
+    const net = Number(report.querySelector('.tiles em')?.textContent.match(/[+−-]?\d+(?:\.\d+)?\s*$/)?.[0].replace('−', '-'));
+    if(cash !== `${openingMoney} → ${g.V.money}` || net !== Math.round((g.V.money - openingMoney)*10)/10)
+      issue(`第${s + 1}季季报的村库余额或净变化与实际不符`);
+    const percent = value => Math.round(value*1000)/10;
+    for(const key of ['coral', 'fish', 'clar', 'pelagic']){
+      const endpoints = report.querySelector(`[data-metric="${key}"] td`)?.textContent;
+      if(endpoints !== `${percent(openingSea[key])}% → ${percent(g.eco[key])}%`) issue(`第${s + 1}季 ${key} 的季初或季末海况有误`);
+    }
+    openingMoney = g.V.money; openingSea = { ...g.eco };
     notes.push([s + 1, [...document.querySelectorAll('#vReport .notes li')].map(l => l.innerText)]);
     click($('rNext'), '下一季'); await step(5);
   }
@@ -73,6 +94,7 @@ async function diveOnce(g, until, step, sleep, issue, audit, where){
   const btn = $('vDive'); if(!btn || btn.disabled){ issue(where + '：潜入按钮不可用'); return 0; }
   btn.click();
   if(!await until(() => g.mode === 'dive' && g.state === 'freedive', '进入潜水', 600)) return 0;
+  if(!$('bayDive').hidden) $('bayFree').click();
   await step(20); audit(where);
   let done = 0; const S = V.sea, go = (p, dy = 1.5) => { player.pos.set(p.x, p.y + dy, p.z); player.speed = 0; };
   for(const k of SEA_KEYS){ if(S.seen[k]) continue; for(let i=0;i<90;i++){ go(SURV[k].pos, 0); g.step(1, 1/30); } if(S.seen[k]) done++; else issue(where + '：调查没完成 ' + k); }

@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const LOW = params.get('q') === 'low';
-const Q = { maxPr: Math.min(devicePixelRatio, LOW ? 1 : 1.5), pr: Math.min(devicePixelRatio, LOW ? 1 : 1.5), shadow: LOW ? 1024 : 2048, steps: LOW ? 14 : 28, samples: LOW ? 0 : 4 };
+const Q = { pr: Math.min(devicePixelRatio, LOW ? 1 : 1.5), shadow: LOW ? 1024 : 2048, steps: LOW ? 14 : 28, samples: LOW ? 0 : 4 };
 const SURFACE = 42, WORLD_R = 128;
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -54,14 +54,17 @@ const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.3, 900)
 
 const sceneRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: Q.samples });
 sceneRT.depthTexture = new THREE.DepthTexture(4, 4); sceneRT.depthTexture.type = THREE.UnsignedIntType;
-const volRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType });
-const shadowRT = new THREE.WebGLRenderTarget(Q.shadow, Q.shadow);
+const volRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: false });
+const shadowRT = new THREE.WebGLRenderTarget(Q.shadow, Q.shadow, { format: THREE.RedFormat });
 shadowRT.depthTexture = new THREE.DepthTexture(Q.shadow, Q.shadow); shadowRT.depthTexture.type = THREE.UnsignedIntType;
 
 // ======================================================================= shared uniforms + GLSL
 const patchLife = new Float32Array(14);
+const BAY_DEPTH_LAYER = 4;
+const CAUSTIC_TILE_SIZE = 512;
+let bayRenderActive = false;
 const U = {
-  uTime: { value: 0 }, uHealth: { value: 0 },
+  uTime: { value: 0 }, uHealth: { value: 0 }, uCausticTile: { value: null },
   uSunDir: { value: new THREE.Vector3(0.36, 0.88, 0.3).normalize() },
   uSunCol: { value: new THREE.Vector3(3.3, 3.15, 2.9) },
   uAbs: { value: new THREE.Vector3() }, uSca: { value: new THREE.Vector3() },
@@ -70,6 +73,18 @@ const U = {
   uPatchLife: { value: patchLife }, uRise: { value: 1 }, uNight: { value: 0 },
   uPortal: { value: 0 }, uBoxMin: { value: new THREE.Vector3() }, uBoxMax: { value: new THREE.Vector3() },
 };
+const CAUSTIC_LAYER = /* glsl */`
+float causticLayer(vec2 p, float t){
+  const float TAU = 6.28318530718;
+  vec2 q = mod(p * TAU, TAU) - 250.0; vec2 i = q; float c = 1.0; const float inten = 0.005;
+  for(int n = 0; n < 4; n++){
+    float tt = t * (1.0 - (3.5 / float(n + 1)));
+    i = q + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
+    c += 1.0 / length(vec2(q.x / (sin(i.x + tt) / inten), q.y / (cos(i.y + tt) / inten)));
+  }
+  c /= 4.0; c = 1.17 - pow(c, 1.4);
+  return pow(abs(c), 8.0);
+}`;
 const COMMON = /* glsl */`
 #define SURF 42.0
 ${LOW ? '#define LOWQ 1' : ''}
@@ -77,7 +92,13 @@ uniform float uTime; uniform float uHealth;
 uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAbs; uniform vec3 uSca;
 uniform sampler2D uShadowMap; uniform mat4 uShadowMat; uniform float uShadowTexel;
 uniform vec4 uPulse; uniform float uPulseFade; uniform float uRise; uniform float uNight;
-uniform float uPortal; uniform vec3 uBoxMin; uniform vec3 uBoxMax;
+#ifdef BAY_VIEW
+  #define uPortal 0.0
+  uniform sampler2D uCausticTile;
+#else
+  uniform float uPortal;
+#endif
+uniform vec3 uBoxMin; uniform vec3 uBoxMax;
 
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
@@ -108,9 +129,11 @@ float portalEntry(vec3 wp, out float d){
 }
 // only what lies between the camera and the glass is cut away; past the far walls the sea simply continues
 void clipPortal(vec3 wp){
+#ifndef BAY_VIEW
   if(uPortal < 0.5) return;
   float d; float te = portalEntry(wp, d);
   if(d < te - 0.1 || wp.y > uBoxMax.y + 0.05) discard;
+#endif
 }
 float waterPath(vec3 wp){
   float d; float te = uPortal > 0.5 ? portalEntry(wp, d) : 0.0;
@@ -126,21 +149,23 @@ vec3 fogged(vec3 col, vec3 wp){
 vec3 transmit(float d){ return exp(-(uAbs + uSca) * d); }
 
 // ---- caustics, projected along the refracted sun so they slide correctly over relief
-float causticLayer(vec2 p, float t){
-  const float TAU = 6.28318530718;
-  vec2 q = mod(p * TAU, TAU) - 250.0; vec2 i = q; float c = 1.0; const float inten = 0.005;
-  for(int n = 0; n < 4; n++){
-    float tt = t * (1.0 - (3.5 / float(n + 1)));
-    i = q + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
-    c += 1.0 / length(vec2(q.x / (sin(i.x + tt) / inten), q.y / (cos(i.y + tt) / inten)));
-  }
-  c /= 4.0; c = 1.17 - pow(c, 1.4);
-  return pow(abs(c), 8.0);
+${CAUSTIC_LAYER}
+#ifdef BAY_VIEW
+vec2 causticUV(vec2 p){
+  // Both ends of the original period have their own texel, including the slight jump at the seam.
+  return (fract(p) * ${CAUSTIC_TILE_SIZE - 1}.0 + 0.5) / ${CAUSTIC_TILE_SIZE}.0;
 }
+#endif
 vec3 caustics(vec3 wp, vec3 n){
   vec2 p = (wp.xz + uSunDir.xz / uSunDir.y * (SURF - wp.y)) * 0.042;
   float t = uTime * 0.42;
-#ifdef LOWQ
+#ifdef BAY_VIEW
+  vec2 offset = vec2(0.0035, 0.0);
+  vec3 c = vec3(textureLod(uCausticTile, causticUV(p + offset), 0.0).r,
+                textureLod(uCausticTile, causticUV(p), 0.0).r,
+                textureLod(uCausticTile, causticUV(p - offset), 0.0).r);
+  c = c * 0.7 + textureLod(uCausticTile, causticUV(p * 1.71 + 0.37), 0.0).g * 0.3;
+#elif defined(LOWQ)
   vec3 c = vec3(causticLayer(p, t));
 #else
   vec3 c = vec3(causticLayer(p + vec2(0.0035, 0.0), t), causticLayer(p, t), causticLayer(p - vec2(0.0035, 0.0), t));
@@ -186,23 +211,41 @@ vec3 bump(vec3 n, vec3 p, float h, float k){
 }
 
 vec3 shade(vec3 alb, vec3 n, vec3 wp, float ao){
-  vec3 L = sunAt(wp.y);
   float ndl = max(dot(n, uSunDir), 0.0);
-  float sh = shadowAt(wp, n);
-  float clarity = mix(0.3, 1.0, uHealth);
-  vec3 direct = L * ndl * sh * (0.55 + caustics(wp, n) * 2.4 * clarity);
+  vec3 direct = vec3(0.0);
+  if(ndl > 0.0){
+    float sh = shadowAt(wp, n);
+    if(sh > 0.0){
+      vec3 c = vec3(0.0);
+      if(n.y > -0.35 && wp.y < SURF - 1.0) c = caustics(wp, n);
+      direct = sunAt(wp.y) * ndl * sh * (0.55 + c * 2.4 * mix(0.3, 1.0, uHealth));
+    }
+  }
   vec3 tint = uSca / (uAbs + uSca);
   vec3 amb = sunAt(wp.y + 8.0) * mix(tint * 0.07, tint * 0.32 + 0.05, n.y * 0.5 + 0.5) * ao;
   vec3 col = alb * (direct + amb);
-  float pd = distance(wp, uPulse.xyz);
-  float rq = (pd - uPulse.w) * 0.3;
-  col += vec3(0.25, 0.95, 1.0) * exp(-rq * rq) * uPulseFade * 1.2;
+  if(uPulseFade > 0.0){
+    float rq = (distance(wp, uPulse.xyz) - uPulse.w) * 0.3;
+    col += vec3(0.25, 0.95, 1.0) * exp(-rq * rq) * uPulseFade * 1.2;
+  }
   return col;
 }`;
-const mat = (o) => new THREE.ShaderMaterial({ ...o, uniforms: { ...U, ...(o.uniforms || {}) } });
+function selectOceanProgram(){
+  if(!!this.defines.BAY_VIEW === bayRenderActive) return;
+  if(bayRenderActive) this.defines.BAY_VIEW = 1;
+  else delete this.defines.BAY_VIEW;
+  this.needsUpdate = true;
+}
+const mat = (o) => {
+  const m = new THREE.ShaderMaterial({ ...o, uniforms: { ...U, ...(o.uniforms || {}) } });
+  if(o.fragmentShader.startsWith(COMMON)) m.onBeforeRender = selectOceanProgram;
+  return m;
+};
 
 // depth-only twin of a material, used by the sun shadow pass
 const casters = [];
+const LIVE_SHADOW = 1, FIXED_REEF_SHADOW = 3;
+const depthMaterials = new WeakMap();
 const DEPTH_FRAG = `
 #ifdef FAN
 varying vec3 vL;
@@ -214,11 +257,15 @@ void main(){
 #endif
   gl_FragColor = vec4(1.0);
 }`;
-function caster(mesh){
+function caster(mesh, layer = LIVE_SHADOW){
   const m = mesh.material;
-  const d = new THREE.ShaderMaterial({ vertexShader: m.vertexShader, fragmentShader: DEPTH_FRAG, uniforms: m.uniforms,
-    defines: { ...(m.defines || {}), DEPTH_PASS: 1 }, side: THREE.DoubleSide });
-  mesh.layers.enable(1); casters.push([mesh, m, d]); return mesh;
+  let d = depthMaterials.get(m);
+  if(!d){
+    d = new THREE.ShaderMaterial({ vertexShader: m.vertexShader, fragmentShader: DEPTH_FRAG, uniforms: m.uniforms,
+      defines: { ...(m.defines || {}), DEPTH_PASS: 1 }, side: THREE.DoubleSide, colorWrite: false });
+    depthMaterials.set(m, d);
+  }
+  mesh.layers.enable(layer); casters.push([mesh, m, d]); return mesh;
 }
 
 // ======================================================================= backdrop + surface

@@ -2,7 +2,7 @@
 // ======================================================================= fish (boids, CPU spatial hash)
 const SCHOOLS = [];
 function addSchool(o){ SCHOOLS.push({ x: 0, y0: 15, z: 0, ph: rng()*6.283, f: 0.05 + rng()*0.05, swirl: rng() < .5 ? 1 : -1, ...o }); return SCHOOLS.length - 1; }
-function makePool(n, sep2, nb2){ return { n, p: new Float32Array(n*3), v: new Float32Array(n*3), seed: new Float32Array(n*4), sc: new Uint8Array(n), active: 0, sep2, nb2, geo: null }; }
+function makePool(n, sep2, nb2){ return { n, p: new Float32Array(n*3), v: new Float32Array(n*3), seed: new Float32Array(n*4), sc: new Uint8Array(n), active: 0, sep2, nb2 }; }
 
 const sEscort = addSchool({ kind: 'escort', species: 1, size: 0.8 });
 const roamSpecies = [0, 2, 3, 4, 5, 6, 1, 2, 4, 0, 3, 6, 5];
@@ -120,56 +120,64 @@ void main(){
   col += eye * L * pow(max(dot(R, uSunDir), 0.0), 80.0) * 3.0;
   gl_FragColor = vec4(fogged(col, vW), 1.0);
 }`;
-let fishBase;
-{
-  const body = new THREE.SphereGeometry(1, 20, 14); body.scale(0.16, 0.38, 1.0);
-  const p = body.attributes.position;
-  for(let i=0;i<p.count;i++){ const z = p.getZ(i); if(z < 0){ const k = 1 - 0.8*Math.min(1, -z); p.setX(i, p.getX(i)*k); p.setY(i, p.getY(i)*k); }
-    else { p.setY(i, p.getY(i)*(1 - 0.15*z)); } }
-  body.computeVertexNormals();
-  const geo = (pts, nrm = [1, 0, 0]) => { const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(pts.map(() => nrm).flat(), 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(pts.map(() => [0, 0]).flat(), 2));
-    return g; };
-  // a fin as a strip between a base line on the body and a curved outer edge (both lists of [y, z]), in the x = 0 plane unless lifted
-  const strip = (base, edge, x0 = 0, x1 = 0) => { const t = [];
-    for(let i=0;i<base.length - 1;i++){ const A = [x0, ...base[i]], B = [x0, ...base[i + 1]], C = [x1, ...edge[i + 1]], D = [x1, ...edge[i]]; t.push(A, B, C, A, C, D); }
-    return t; };
-  // forked tail: a fan from the narrow peduncle out to two swept lobes
-  const tailEdge = [[0.6, -1.66], [0.46, -1.52], [0.3, -1.38], [0.13, -1.28], [0, -1.24], [-0.13, -1.28], [-0.3, -1.38], [-0.46, -1.52], [-0.6, -1.66]];
-  const tailBase = tailEdge.map((e, i) => [0.075 - 0.15*i/(tailEdge.length - 1), -0.8]);
-  const tail = geo(strip(tailBase, tailEdge));
-  // dorsal: rises to a soft peak behind the head and tapers back toward the tail
-  const dz = [0.38, 0.25, 0.1, -0.05, -0.2, -0.35, -0.5], dorsal = geo(strip(dz.map(z => [0.36 - 0.12*Math.max(0, -z), z]), dz.map((z, i) => [0.36 - 0.12*Math.max(0, -z) + [0.05, 0.22, 0.27, 0.24, 0.19, 0.13, 0.04][i], z - 0.06])));
-  const az = [-0.12, -0.25, -0.38, -0.52, -0.62], anal = geo(strip(az.map(z => [-0.25 + 0.08*Math.max(0, -z - 0.2), z]), az.map((z, i) => [-0.25 + 0.08*Math.max(0, -z - 0.2) - [0.03, 0.15, 0.17, 0.11, 0.02][i], z - 0.05])));
-  // pectoral and pelvic fins: small fans swept back, one each side
-  const fan = (sx, y, z, len, drop) => [[sx*0.14, y, z], [sx*(0.14 + len), y - drop, z - len*0.9], [sx*0.13, y - 0.04, z - 0.18],
-    [sx*0.14, y, z], [sx*(0.14 + len*0.7), y - drop*1.3, z - len*0.5], [sx*(0.14 + len), y - drop, z - len*0.9]];
-  const pect = geo([...fan(1, -0.08, 0.36, 0.32, 0.12), ...fan(-1, -0.08, 0.36, 0.32, 0.12)], [0, 1, 0]);
-  const pelv = geo([...fan(1, -0.3, 0.15, 0.16, 0.12), ...fan(-1, -0.3, 0.15, 0.16, 0.12)], [0, 1, 0]);
-  const bodyN = body.toNonIndexed(), parts = [bodyN, tail, dorsal, anal, pect, pelv];
-  parts.forEach((g, i) => g.setAttribute('aFin', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(i ? 1 : 0), 1)));
-  fishBase = mergeGeometries(parts);
+const fishBase = window.reefFishGeometry;
+function fishDrawGeometry(capacity){
+  const g = new THREE.InstancedBufferGeometry();
+  g.setIndex(fishBase.index);
+  g.setAttribute('position', fishBase.attributes.position);
+  g.setAttribute('normal', fishBase.attributes.normal);
+  g.setAttribute('aFin', fishBase.attributes._fin);
+  const data = new THREE.InstancedInterleavedBuffer(new Float32Array(capacity*10), 10).setUsage(THREE.DynamicDrawUsage);
+  g.setAttribute('aPos', new THREE.InterleavedBufferAttribute(data, 3, 0));
+  g.setAttribute('aDir', new THREE.InterleavedBufferAttribute(data, 3, 3));
+  g.setAttribute('aSeed', new THREE.InterleavedBufferAttribute(data, 4, 6));
+  g.instanceCount = 0;
+  return g;
 }
-function makeFishMesh(pool){
-  const geo = new THREE.InstancedBufferGeometry().copy(fishBase);
-  geo.setAttribute('aPos', new THREE.InstancedBufferAttribute(pool.p, 3).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('aDir', new THREE.InstancedBufferAttribute(pool.v, 3).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(pool.seed, 4).setUsage(THREE.DynamicDrawUsage));
-  geo.instanceCount = 0; pool.geo = geo;
-  const m = new THREE.Mesh(geo, mat({ side: THREE.DoubleSide, vertexShader: fishVert, fragmentShader: fishFrag }));
-  m.frustumCulled = false; scene.add(m); caster(m);
-}
-[reg, bait].forEach(pool => {
+const fishPools = [reg, bait];
+fishPools.forEach(pool => {
   for(let i=0;i<pool.n;i++){ const S = SCHOOLS[pool.sc[i]];
     pool.seed.set([rng()*6.283, S.size * (0.82 + rng()*0.36), S.species, rng()], i*4);
     pool.v.set([rng()-.5, 0, rng()-.5], i*3); }
-  makeFishMesh(pool);
+  pool.colorGeometry = fishDrawGeometry(pool.n); pool.shadowGeometry = fishDrawGeometry(pool.n);
+  const m = new THREE.Mesh(pool.colorGeometry, mat({ side: THREE.DoubleSide, vertexShader: fishVert, fragmentShader: fishFrag }));
+  m.frustumCulled = false; pool.mesh = m; scene.add(m); caster(m);
+  // The bay camera can look through an entire school. Test its opaque silhouettes before shading the fish.
+  const depth = new THREE.Mesh(pool.colorGeometry, depthMaterials.get(m.material));
+  depth.frustumCulled = false; depth.layers.set(BAY_DEPTH_LAYER); depth.renderOrder = -18;
+  pool.depthMesh = depth; scene.add(depth);
 });
+
+// The two passes see different fish. Keep the simulation in its original order and compact only the draw buffers.
+const fishFrustum = new THREE.Frustum(), fishProjection = new THREE.Matrix4(), fishBounds = new THREE.Sphere();
+fishBase.computeBoundingSphere();
+// Sphere about the fish origin, expanded for the largest species stretch and the animated tail in fishVert.
+const fishRadius = (fishBase.boundingSphere.center.length() + fishBase.boundingSphere.radius)*1.85 + 0.30;
+function prepareFishDraws(cam, shadow){
+  fishFrustum.setFromProjectionMatrix(fishProjection.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  for(const pool of fishPools){
+    if(!shadow) pool.depthMesh.visible = pool.mesh.visible;
+    if(!pool.mesh.visible) continue;
+    const g = shadow ? pool.shadowGeometry : pool.colorGeometry;
+    const data = g.attributes.aPos.data, out = data.array;
+    let used = 0;
+    for(let i=0;i<pool.active;i++){
+      const p = i*3, s = i*4;
+      fishBounds.center.fromArray(pool.p, p); fishBounds.radius = fishRadius*pool.seed[s+1];
+      if(!fishFrustum.intersectsSphere(fishBounds)) continue;
+      for(let k=0;k<3;k++){ out[used+k] = pool.p[p+k]; out[used+3+k] = pool.v[p+k]; }
+      for(let k=0;k<4;k++) out[used+6+k] = pool.seed[s+k];
+      used += 10;
+    }
+    g.instanceCount = used/10; pool.mesh.geometry = g;
+    if(used){ data.clearUpdateRanges(); data.addUpdateRange(0, used); data.needsUpdate = true; }
+  }
+}
 const CS = 4, GX = 96, GY = 12, GZ = 128, GO = -192, NCELL = GX*GY*GZ;
-const cellStart = new Int32Array(NCELL + 1), cellCur = new Int32Array(NCELL);
-const cellItems = new Int32Array(Math.max(NR, NB)), fishCell = new Int32Array(Math.max(NR, NB));
+const maxFish = Math.max(NR, NB), cellSlot = new Int32Array(NCELL);
+const cellCode = new Int32Array(maxFish+1), cellHead = new Int32Array(maxFish+1);
+const nextFish = new Int32Array(maxFish), fishCell = new Int32Array(maxFish);
+const neighbourStart = new Int32Array(maxFish+2), neighbourHeads = new Int32Array(maxFish*27);
 function spawnFish(pool, i, far){
   const S = SCHOOLS[pool.sc[i]];
   let x, y, z;
@@ -202,31 +210,46 @@ function updateSchools(t){
 function updateFish(pool, dt){
   const n = pool.active; if(!n) return;
   const P = pool.p, V = pool.v, SC = pool.sc, SD = pool.seed;
-  cellStart.fill(0);
-  for(let i=0;i<n;i++){
+  let cells = 0;
+  // Reverse insertion keeps neighbours in ascending fish order, including the twelve-neighbour cutoff.
+  for(let i=n-1;i>=0;i--){
     const cx = clamp(((P[i*3] - GO)/CS) | 0, 0, GX-1), cy = clamp((P[i*3+1]/CS) | 0, 0, GY-1), cz = clamp(((P[i*3+2] - GO)/CS) | 0, 0, GZ-1);
-    const c = (cy*GZ + cz)*GX + cx; fishCell[i] = c; cellStart[c+1]++;
+    const c = (cy*GZ + cz)*GX + cx;
+    let slot = cellSlot[c];
+    if(!slot){ slot = ++cells; cellSlot[c] = slot; cellCode[slot] = c; cellHead[slot] = 0; }
+    fishCell[i] = slot; nextFish[i] = cellHead[slot]; cellHead[slot] = i + 1;
   }
-  for(let c=0;c<NCELL;c++){ cellStart[c+1] += cellStart[c]; cellCur[c] = cellStart[c]; }
-  for(let i=0;i<n;i++) cellItems[cellCur[fishCell[i]]++] = i;
+  // All fish in a cell visit the same occupied neighbour cells, in y/z/x order.
+  let used = 0;
+  for(let slot=1;slot<=cells;slot++){
+    const c = cellCode[slot], x = c % GX, z = Math.floor(c/GX) % GZ, y = Math.floor(c/(GX*GZ));
+    neighbourStart[slot] = used;
+    for(let yy=Math.max(0,y-1);yy<=Math.min(GY-1,y+1);yy++){
+      for(let zz=Math.max(0,z-1);zz<=Math.min(GZ-1,z+1);zz++){
+        const row = (yy*GZ+zz)*GX;
+        for(let xx=Math.max(0,x-1);xx<=Math.min(GX-1,x+1);xx++){
+          const other = cellSlot[row+xx]; if(other) neighbourHeads[used++] = cellHead[other];
+        }
+      }
+    }
+  }
+  neighbourStart[cells+1] = used;
   const sep2 = pool.sep2, nb2 = pool.nb2, NPRED = PRED.length;
   for(let i=0;i<n;i++){
     const i3 = i*3, x = P[i3], y = P[i3+1], z = P[i3+2]; let vx = V[i3], vy = V[i3+1], vz = V[i3+2];
     const sc = SC[i], S = SCHOOLS[sc];
     let sx=0, sy=0, sz=0, ax=0, ay=0, az=0, cx=0, cy=0, cz=0, ns=0, seen=0;
-    const c = fishCell[i], cxi = c % GX, czi = ((c / GX) | 0) % GZ, cyi = (c / (GX*GZ)) | 0;
-    scan: for(let dy=-1;dy<=1;dy++){ const yy = cyi+dy; if(yy<0||yy>=GY) continue;
-      for(let dz=-1;dz<=1;dz++){ const zz = czi+dz; if(zz<0||zz>=GZ) continue;
-        for(let dx=-1;dx<=1;dx++){ const xx = cxi+dx; if(xx<0||xx>=GX) continue;
-          const cc = (yy*GZ + zz)*GX + xx;
-          for(let k=cellStart[cc], e=cellStart[cc+1]; k<e; k++){
-            const j = cellItems[k]; if(j === i) continue;
-            const j3 = j*3, ex = x - P[j3], ey = y - P[j3+1], ez = z - P[j3+2], d2 = ex*ex + ey*ey + ez*ez;
-            if(d2 > nb2 || d2 < 1e-6) continue;
-            if(d2 < sep2){ const w = 1/d2; sx += ex*w; sy += ey*w; sz += ez*w; }
-            if(SC[j] === sc){ ax += V[j3]; ay += V[j3+1]; az += V[j3+2]; cx += P[j3]; cy += P[j3+1]; cz += P[j3+2]; ns++; }
-            if(++seen >= 12) break scan;
-          } } } }
+    const slot = fishCell[i];
+    scan: for(let k=neighbourStart[slot];k<neighbourStart[slot+1];k++){
+      for(let link=neighbourHeads[k];link;link=nextFish[link-1]){
+        const j = link-1; if(j === i) continue;
+        const j3 = j*3, ex = x - P[j3], ey = y - P[j3+1], ez = z - P[j3+2], d2 = ex*ex + ey*ey + ez*ez;
+        if(d2 > nb2 || d2 < 1e-6) continue;
+        if(d2 < sep2){ const w = 1/d2; sx += ex*w; sy += ey*w; sz += ez*w; }
+        if(SC[j] === sc){ ax += V[j3]; ay += V[j3+1]; az += V[j3+2]; cx += P[j3]; cy += P[j3+1]; cz += P[j3+2]; ns++; }
+        if(++seen >= 12) break scan;
+      }
+    }
     const sepK = sep2 < 1 ? 0.9 : 3.2;
     let fx = sx*sepK, fy = sy*sepK, fz = sz*sepK;
     if(ns){ const inv = 1/ns; fx += (ax*inv - vx)*1.3 + (cx*inv - x)*0.7; fy += (ay*inv - vy)*1.3 + (cy*inv - y)*0.7; fz += (az*inv - vz)*1.3 + (cz*inv - z)*0.7; }
@@ -267,5 +290,5 @@ function updateFish(pool, dt){
     { const i4 = i3/3*4; SD[i4] = (SD[i4] + dt*(5 + sp*k*1.2)/Math.sqrt(SD[i4 + 1])) % 6283.1853; }   // tail-beat phase: speeds up and slows down smoothly
     P[i3] = x + vx*dt; P[i3+1] = Math.min(Math.max(y + vy*dt, gy + 0.25), SURFACE - 0.6); P[i3+2] = z + vz*dt;   // never through the sand, never out of the water
   }
-  pool.geo.attributes.aPos.needsUpdate = true; pool.geo.attributes.aDir.needsUpdate = true; pool.geo.attributes.aSeed.needsUpdate = true;
+  for(let slot=1;slot<=cells;slot++) cellSlot[cellCode[slot]] = 0;
 }

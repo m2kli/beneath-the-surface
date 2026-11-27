@@ -189,7 +189,9 @@ function updateCreatures(dt){
   const m = ENT.manta.st, sh = ENT.shark.st, je = ENT.jelly.st, tu = ENT.turtle.st;
   if(ctl !== 'manta'){ const a = time*0.05; seek(m, Math.cos(a)*55, 18 + Math.sin(time*0.2)*4, Math.sin(a)*40 - 45, dt, 0.5, 6.5); m.roll += (m.yawV*0.55 - m.roll)*Math.min(1, dt*2); keepIn(m, SPECIES_INFO.manta); }
   if(ctl !== 'shark'){ const a = -time*0.04 + 1.3; seek(sh, Math.cos(a)*80, 13 + Math.sin(time*0.3)*3, Math.sin(a)*55 - 60, dt, 0.45, 6.5); sh.roll += (sh.yawV*0.4 - sh.roll)*Math.min(1, dt*2); keepIn(sh, SPECIES_INFO.shark); }
-  if(ctl !== 'turtle'){ tu.ang += dt*0.045; const x = TURTLE_HOME.x + Math.cos(tu.ang)*15, z = TURTLE_HOME.z + Math.sin(tu.ang)*15;
+  if(ctl !== 'turtle'){ tu.ang += dt*0.045;
+    const shift = ['boats','tide','outfall'].includes(V.bay?.station) ? 5 : 0;
+    const x = TURTLE_HOME.x + shift + Math.cos(tu.ang)*15, z = TURTLE_HOME.z + Math.sin(tu.ang)*15;
     seek(tu, x, Math.max(topAt(x, z) + 4.2, 9) + Math.sin(time*0.4)*0.7, z, dt, 0.9, 3.4); keepIn(tu, SPECIES_INFO.turtle); tu.air = 1; }
   if(ctl !== 'jelly'){ je.cool -= dt; if(je.cool < 0){ je.cool = 1.4 + rng()*0.9; jellyPulse(je); }
     je.yaw += Math.sin(time*0.17)*0.15*dt; je.pitch = lerp(je.pitch, je.pos.y > SURFACE - 8 ? -0.2 : 1.15, dt*0.4);
@@ -216,7 +218,7 @@ function updateCreatures(dt){
 }
 function setAvatarCard(){
   const i = avatar.info;
-  $('avatarCard').querySelector('.an').textContent = i.name; $('avatarCard').querySelector('.ab').textContent = i.bio; $('avatarCard').querySelector('.ak').textContent = i.keys;
+  $('avatarCard').querySelector('.an').textContent = gameText(i.name); $('avatarCard').querySelector('.ab').textContent = gameText(i.bio); $('avatarCard').querySelector('.ak').textContent = gameText(i.keys);
   $('avatarCard').querySelector('.air').style.display = avatar.kind === 'turtle' ? 'block' : 'none';
 }
 function releaseSchool(){
@@ -264,10 +266,10 @@ function updateSwap(){
   if(swapCand){
     const p = tmp.copy(swapCand.pos).project(camera);
     $('swap').style.transform = `translate(${(p.x*0.5 + 0.5)*innerWidth + 26}px, ${(-p.y*0.5 + 0.5)*innerHeight - 8}px)`;
-    $('swap').querySelector('span').textContent = `化身为 ${swapCand.name}`; $('swap').classList.add('on');
+    $('swap').querySelector('span').textContent = gameText(`化身为 ${swapCand.name}`); $('swap').classList.add('on');
   } else $('swap').classList.remove('on');
 }
-addEventListener('keydown', e => { if(e.code === 'KeyF' && mode === 'dive' && swapCand){ becomeAvatar(swapCand.av); } });
+addEventListener('keydown', e => { if(e.code === 'KeyF' && mode === 'dive' && !baySession && swapCand){ becomeAvatar(swapCand.av); } });
 setAvatarCard();
 
 // ======================================================================= coral spawning (good ending)

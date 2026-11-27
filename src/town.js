@@ -27,11 +27,13 @@ class Kit {
   glass(w, h, d, x, y, z, ry){ return this.put('g', new THREE.BoxGeometry(w, h, d), null, x, y, z, ry); }
   build(x = 0, z = 0, ry = 0, y){
     const g = new THREE.Group(); g.position.set(x, y ?? dioH(x, z), z); g.rotation.y = ry;
+    this.populate(g); dio.add(g); return g;
+  }
+  populate(g){
     const mk = (list, mat, cast) => { if(!list.length) return; const m = new THREE.Mesh(mergeGeometries(list), mat); m.castShadow = cast; m.receiveShadow = true; g.add(m); };
     mk(this.L.p, vcMat, true); mk(this.L.w, winMat, false); mk(this.L.l, lampMat, false); mk(this.L.g, glassMat, false);
     if(!this.noContact && g.children[0]){ const gg = g.children[0].geometry; gg.computeBoundingBox(); const bb = gg.boundingBox, sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z;
       if(sx > 0.8 && sz > 0.8 && sx < 30 && sz < 30 && bb.min.y > -1) g.add(contactShadow(sx, sz, (bb.min.x + bb.max.x)/2, (bb.min.z + bb.max.z)/2)); }
-    dio.add(g); return g;
   }
 }
 const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
@@ -297,17 +299,39 @@ function shoreZ(x){ let a = -6, b = 20; for(let it=0;it<22;it++){ const m = (a +
 // ---- every tiered thing: variants per development stage, swapped with a puff of dust when the village grows
 const TIERED = [];
 function tiered(vars, when, x, z, order, swap = false, big = 14){ TIERED.push({ vars, uniq: [...new Set(vars.filter(Boolean))], when, x, z, order, swap, big, shown: -1, wait: -1 }); }
+// Stable anchors let the picker and construction UI identify a slot even before its first model is needed.
+function buildingSlot(x, z, i, ry, count){
+  const y = dioH(x, z), vars = [];
+  for(let v=0;v<count;v++){
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry;
+    g.scale.setScalar(0.001); g.visible = false; dio.add(g); vars.push(g);
+  }
+  return { vars, x, z, i, cur: -1 };
+}
+function houseVariant(i, variant){
+  if(variant === 0) return hutKit(i);
+  if(variant <= 2) return cottageKit(i, variant === 2);
+  return modernKit(i, variant - 1);
+}
+function shopVariant(i, variant){ return shopKit(Math.floor(variant/3), i, variant % 3 + 1); }
+function showBuildingVariant(slot, next, makeKit, dust, dt){
+  if(next !== slot.cur){
+    if(next >= 0 && !slot.vars[next].children.length) makeKit(slot.i, next).populate(slot.vars[next]);
+    if(next >= 0 && slot.cur >= 0) puff(slot.x, slot.z, dust);
+    slot.cur = next;
+  }
+  for(let j=0;j<slot.vars.length;j++){
+    const g = slot.vars[j];
+    if(j === next || g.visible) popTo(g, j === next, dt);
+  }
+}
 {
   VB.houseVars = HOUSE_SLOTS.map(([x, z], i) => {
-    const R = mulberry32(900 + i), ry = (R() - 0.5)*0.3;
-    const vars = [hutKit(i), cottageKit(i, false), cottageKit(i, true), modernKit(i, 2), modernKit(i, 3), modernKit(i, 4)].map(k => k.build(x, z, ry));
-    vars.forEach(g => { g.scale.setScalar(0.001); g.visible = false; });
-    return { vars, x, z, i, cur: -1 };
+    const ry = (mulberry32(900 + i)() - 0.5)*0.3;
+    return buildingSlot(x, z, i, ry, 6);
   });
   VB.houses = VB.houseVars.map(h => h.vars[1]);
-  VB.shopVars = SHOP_AT.map(([x, z], j) => { const vars = [];
-    for(let t=0;t<3;t++) for(let lv=1;lv<=3;lv++){ const g = shopKit(t, j, lv).build(x, z, 0); g.scale.setScalar(0.001); g.visible = false; vars.push(g); }
-    return { vars, x, z, cur: -1 }; });
+  VB.shopVars = SHOP_AT.map(([x, z], i) => buildingSlot(x, z, i, 0, 9));
   VB.shops = VB.shopVars.map(s => s.vars[4]);
   // street lights face the road
   LAMP_AT.forEach(([x, z], i) => {
@@ -594,28 +618,7 @@ const HARBOR = (() => { const x0 = 29, x1 = 48, sz = shoreZ(40), y = 0.55, k = n
 UPG.push({ g: VB.harbor, on: () => (V.harbor || 0) > 0, x: 40, z: HARBOR.sz });
 // ships at the quay: offshore trawlers along the front, white whale-watching catamarans inside the breakwater
 const SHIPS = [];
-function offshoreShip(color){   // a deep-sea longliner: high bow, wheelhouse aft, a mast and a line drum
-  const g = new THREE.Group(), L = 7.2, W = 2.3, Hh = 1.4;
-  dm(hullGeo(L, W, Hh), SM(color, { flatShading: false, roughness: 0.6 }), 0, 0.2, 0, g);
-  dm(hullGeo(L*1.01, W*1.04, Hh*0.14), SM('#f2f2ee'), 0, 0.2 + Hh*0.36, 0, g);
-  dm(new THREE.BoxGeometry(W*0.8, 0.1, L*0.8), SM('#9a8f80'), 0, 0.2 + Hh*0.42, -L*0.04, g);
-  dm(new THREE.BoxGeometry(W*0.7, 1.6, L*0.26), SM('#f6f4ee'), 0, 1.75, -L*0.22, g);
-  dm(new THREE.BoxGeometry(W*0.72, 0.3, L*0.27), winMat, 0, 2.2, -L*0.22, g);
-  dm(new THREE.BoxGeometry(W*0.8, 0.12, L*0.3), SM('#2f3b44'), 0, 2.6, -L*0.22, g);
-  dm(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 6), SM('#d9d9d9'), 0, 3.6, -L*0.05, g);
-  dm(new THREE.BoxGeometry(1.4, 0.08, 0.08), SM('#d9d9d9'), 0, 4.6, -L*0.05, g);
-  dm(new THREE.CylinderGeometry(0.45, 0.45, 1.2, 12).rotateZ(Math.PI/2), SM('#c0392b'), 0, 1.25, L*0.2, g);
-  for(const sx of [-1, 1]) dm(new THREE.BoxGeometry(0.1, 0.5, L*0.35), SM('#e8a33a'), sx*W*0.42, 1.0, L*0.15, g);
-  // bridge wings and a radar, a row of portholes, orange buoys racked on the rail, a waterline stripe, a lifeboat canister
-  dm(new THREE.BoxGeometry(W*1.02, 0.08, 0.6), SM('#f6f4ee'), 0, 2.45, -L*0.22 + L*0.13 + 0.2, g);
-  dm(new THREE.BoxGeometry(0.1, 0.35, 0.1), SM('#e8e8e8'), 0, 2.85, -L*0.22, g); dm(new THREE.BoxGeometry(1.2, 0.06, 0.16), SM('#e8e8e8'), 0, 3.05, -L*0.22, g);
-  for(const sx of [-1, 1]) for(let q=0;q<5;q++) dm(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8).rotateZ(Math.PI/2), SM('#d9e4ea'), sx*(W*0.5 - 0.02), 0.62, -L*0.3 + q*0.75, g);
-  for(let q=0;q<8;q++) dm(new THREE.SphereGeometry(0.13, 8, 6), SM(q % 2 ? '#ff6a3d' : '#ffd166'), (q % 2 ? 1 : -1)*W*0.36, 1.3, L*0.05 + Math.floor(q/2)*0.32, g);
-  dm(hullGeo(L*1.012, W*1.05, Hh*0.06), SM('#b8452f'), 0, 0.2 - Hh*0.1, 0, g);
-  dm(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 10).rotateX(Math.PI/2), SM('#ff7a3d'), W*0.3, 2.0, -L*0.38, g);
-  dio.add(g); g.visible = false; return g;
-}
-for(let i=0;i<6;i++){ const g = offshoreShip(['#2f4f6f', '#7a2e2e', '#2f5f4f'][i % 3]); g.scale.setScalar(1.0); g.rotation.y = 0;   // bows out to sea, side by side
+for(let i=0;i<6;i++){ const g = makeBoat(['#2f4f6f', '#7a2e2e', '#2f5f4f'][i % 3], 'offshore'); g.scale.setScalar(1.0); g.rotation.y = 0;   // bows out to sea, side by side
   g.position.set(30.2 + i*2.65, 0.12, HARBOR.sz + 7.4); SHIPS.push({ g, kind: 'offshore', i, home: g.position.clone() }); }
 for(let i=0;i<3;i++){ const g = makeBoat('#ffffff', 'tour'); g.scale.setScalar(1.25); g.rotation.y = Math.PI/2;
   g.position.set(39.5, 0.12, HARBOR.sz + 13.6 + i*2.6); SHIPS.push({ g, kind: 'whale', i, home: g.position.clone() }); }
@@ -643,11 +646,9 @@ for(let i=0;i<3;i++){ const g = makeBoat('#ffffff', 'tour'); g.scale.setScalar(1
 function updateTown2(dt, running, elev){
   const T = devTier(V), style = Math.min(T, 2);
   for(const h of VB.houseVars){ const built = h.i < V.houses, lv = lvOf(V, 'house', h.i), tg = built ? HSTYLE[style][lv - 1] : -1;
-    if(tg !== h.cur){ if(h.cur >= 0 && tg >= 0) puff(h.x, h.z, 14); h.cur = tg; }
-    for(let j=0;j<h.vars.length;j++) popTo(h.vars[j], j === h.cur, dt); }
+    showBuildingVariant(h, tg, houseVariant, 14, dt); }
   VB.shopVars.forEach((s, j) => { const tg = j < V.shops ? style*3 + lvOf(V, 'shop', j) - 1 : -1;
-    if(tg !== s.cur){ if(s.cur >= 0 && tg >= 0) puff(s.x, s.z, 12); s.cur = tg; }
-    for(let q=0;q<s.vars.length;q++) popTo(s.vars[q], q === s.cur, dt); });
+    showBuildingVariant(s, tg, shopVariant, 12, dt); });
   for(const u of UPG){ const on = u.on(); if(on && !u.was && u.was !== undefined) puff(u.x, u.z, 12); u.was = on; popTo(u.g, on, dt); }
   popTo(VB.resort2, V.resort > 1, dt); popTo(VB.research, (V.research || 0) > 0, dt);
   if(VB.blades.visible) VB.blades.rotation.z += dt*(1.2 + wx.wind*3);
@@ -659,10 +660,11 @@ function updateTown2(dt, running, elev){
 
 // ---- out on the open water: the offshore boats on their long-lines, whale-watchers where the whale is
 const dFleet = [], dWatch = [];
-for(let i=0;i<6;i++){ const g = offshoreShip(['#2f4f6f', '#7a2e2e', '#2f5f4f'][i % 3]); g.scale.setScalar(0.85);
+for(let i=0;i<6;i++){ const g = makeBoat(['#2f4f6f', '#7a2e2e', '#2f5f4f'][i % 3], 'offshore'); g.scale.setScalar(0.85);
   const floats = []; for(let j=0;j<7;j++){ const f = dm(new THREE.SphereGeometry(0.28, 6, 5), SM('#ff7a1a')); f.visible = false; floats.push(f); }
   dFleet.push({ g, floats, a: i*1.05 + 0.3, r: 16 + (i % 3)*7 }); }
 for(let i=0;i<3;i++){ const g = makeBoat('#ffffff', 'tour'); g.scale.setScalar(1.1); dWatch.push({ g, i }); }
+createFleetBatches();
 const fleetTmp = new THREE.Vector3();
 function updateFleet(dt, t){
   const atSea = state === 'running';

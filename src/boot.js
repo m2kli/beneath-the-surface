@@ -8,17 +8,30 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 Object.assign(window, { THREE, EffectComposer, ShaderPass, UnrealBloomPass, FullScreenQuad, mergeGeometries, OrbitControls });
 // in load order
 const FILES = ['core.js', 'seafloor.js', 'fish.js', 'creatures.js', 'avatars.js', 'post.js', 'village.js', 'town.js', 'weather.js',
-  'state.js', 'model.js', 'season.js', 'dive.js', 'flow.js', 'saves.js', 'main.js'];
+  'state.js', 'model.js', 'season.js', 'dive.js', 'flow.js', 'saves.js', 'bay-play.js', 'bay-view.js', 'main.js'];
 // the game's version: shown on the title screen, and used to make browsers fetch fresh files after an update
-const VERSION = '0.1.1-dev'; window.GAME_VERSION = VERSION;
+const VERSION = '0.2.1-dev'; window.GAME_VERSION = VERSION;
 const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const bust = local || new URLSearchParams(location.search).has('nocache') ? '?t=' + Date.now() : '?v=' + VERSION;
-if(bust){ const css = document.querySelector('link[href="src/style.css"]'); if(css) css.href = 'src/style.css' + bust; } // dev: pick up style edits without a hard reload
-const texts = await Promise.all(FILES.map(f => fetch('src/' + f + bust).then(r => { if(!r.ok) throw new Error('could not load src/' + f); return r.text(); })));
+const modelLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const scripts = Promise.all(FILES.map(f => fetch('src/' + f + bust).then(r => { if(!r.ok) throw new Error('could not load src/' + f); return r.text(); })));
+const fishGeometry = modelLoader.loadAsync('assets/models/reef-fish.glb?v=' + VERSION).then(({scene}) => {
+  const geometry = scene.getObjectByName('ReefFish')?.geometry;
+  if(!geometry?.index || !geometry.attributes._fin) throw new Error('Invalid ReefFish mesh or fin mask');
+  return geometry;
+});
+const [texts, fleet, fish] = await Promise.all([scripts, modelLoader.loadAsync('assets/models/fleet.glb?v=' + VERSION), fishGeometry]).catch(error => {
+  document.getElementById('intro').classList.add('load-error');
+  throw error;
+});
+window.fleetModels = fleet.scene;
+window.reefFishGeometry = fish;
 // errors report a line in "game.js"; __srcMap turns it back into file:line
 const map = []; let line = 1;
 texts.forEach((t, i) => { map.push([line, FILES[i]]); line += t.split('\n').length; });

@@ -1,8 +1,8 @@
 # 海面之下 · Beneath the Surface
 
-A fishing village on a floating cut-away island, and the reef it lives on. You run the village season by season from the shore, and dive into the sea to see, and fix, what the village is doing to it. Built with three.js; UI in Chinese.
+A fishing village on a floating cut-away island, and the reef it lives on. You run the village season by season from the shore, and dive into the sea to see, and fix, what the village is doing to it. Built with three.js. The game opens in English. Choose English or 中文 on the title screen to change the language. This browser remembers your choice and your existing saves work in either language.
 
-> **Status: in development (v0.1.1-dev).** Balance, content and visuals are still changing, and saves from an older version may not load.
+> **Status: in development.** The title screen shows the running version. Balance, content and visuals are still changing, and saves from an older version may not load.
 
 **在线试玩 / Play:** https://m2kli.github.io/beneath-the-surface/
 

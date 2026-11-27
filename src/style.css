@@ -190,9 +190,11 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:cros
 #montage .md{font-size:11px;letter-spacing:.3em;opacity:.6;margin:4px 0 9px}
 #montage .mb{width:220px;height:3px;border-radius:3px;background:rgba(30,60,60,.12);overflow:hidden}
 #montage .mb i{display:block;height:100%;width:0;background:linear-gradient(90deg,#f2b35b,#1f8a8a)}
+#montage.on #skipMontage:not([hidden]){pointer-events:auto;margin-top:9px;padding:5px 14px;font-size:12px}
 #village #vSide,#village #vBottom{transition:opacity .6s}
 #village.running #vSide,#village.running #vBottom{opacity:.0;pointer-events:none}
-#vBottom{left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:10px;padding:8px}
+#village:not(.on) #vBottom,#village.zooming #vBottom{visibility:hidden}
+#vBottom{left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:10px;padding:8px;pointer-events:auto}
 #vBottom button,.vcard .btns button{font:inherit;font-size:11px;letter-spacing:.24em;text-transform:uppercase;border-radius:40px;padding:12px 24px;cursor:pointer;transition:.2s;
   border:1px solid rgba(20,110,120,.45);background:rgba(255,255,255,.7);color:#14454c}
 #vBottom button.primary,.vcard .btns button.primary{background:#1f8a8a;color:#fff;border-color:#1f8a8a}
@@ -231,6 +233,7 @@ svg.ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-wid
 /* buttons share one state system */
 #village .btn,.vcard .btns button{font:600 13px "Noto Sans SC",sans-serif;letter-spacing:.06em;text-transform:none;border-radius:40px;padding:11px 20px;cursor:pointer;
   border:1.5px solid var(--edge);background:#fff;color:var(--ink);box-shadow:0 3px 0 #D9CBB0;transition:transform .12s,box-shadow .12s,background .2s,color .2s;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+#village .btn[hidden]{display:none}
 #village .btn:hover:not(:disabled),.vcard .btns button:hover{box-shadow:0 3px 0 #C9B896;border-color:#D4C3A2}
 #village .btn:active:not(:disabled),.vcard .btns button:active{transform:translateY(2px);box-shadow:0 1px 0 #D9CBB0}
 #village .btn.primary,.vcard .btns button.primary{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 3px 0 var(--teal-p)}
@@ -283,8 +286,11 @@ body:not(.vmode) #hud .m i{background:rgba(255,255,255,.16)}
 .tr .q{color:#8a8478;font-size:10px;margin-left:2px;letter-spacing:0}
 .tr.pv{background:#FFF3D6}
 body:not(.vmode) #hud .tr{display:none}
-.tiles .oc .trc{display:flex;align-items:center;justify-content:flex-end;gap:3px}.tiles .oc .tr{font-size:8px}.tiles .oc small{font:500 10px Inter,sans-serif;color:var(--muted)}
 body:not(.vmode) #hud .hint{display:none}
+#diveObservations{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--glass-edge);font-size:11px}
+#diveObservations b{flex-basis:100%;color:#c0e4e8}
+#diveObservations strong{font-variant-numeric:tabular-nums}
+body.vmode #diveObservations{display:none}
 #objective{margin-top:10px;font-size:12px;line-height:1.5;max-width:none}
 #objective:empty{display:none}
 /* right column: decide, preview, commit */
@@ -358,6 +364,17 @@ body:not(.vmode) #hud .hint{display:none}
 #vPredict .sea small{font-size:10.5px;line-height:1.45;color:var(--muted)}
 #vPredict .sea small.warn{color:var(--coral-d)}
 #vDive{position:relative}
+#surveyAdvice:not([hidden]){padding:10px;margin:0 0 10px;border:1px solid var(--teal);border-radius:11px;background:#edf7f3}
+.survey-reading,.survey-options{display:flex;align-items:center;gap:6px}
+.survey-reading{justify-content:space-between;color:var(--teal);font-size:12px}
+.survey-reading select{max-width:65%;font:inherit;color:inherit}
+#surveyAdvice p,.survey-caption{margin:4px 0;font-size:11px;color:var(--muted)}
+.survey-options{align-items:stretch}
+.survey-options button{min-width:0;flex:1;display:grid;gap:3px;padding:6px 8px;border:1px solid var(--teal);border-radius:8px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:var(--ink)}
+.survey-options button:disabled{border-color:var(--edge);cursor:default}
+.survey-options span{display:flex;justify-content:space-between;gap:3px;font-size:11px}
+.survey-options b{font-size:12px}.survey-options strong{font-variant-numeric:tabular-nums}
+.survey-options small{font-size:10px;color:var(--teal)}.survey-options :disabled small{color:var(--muted)}
 #vDive.ping::after{content:'';position:absolute;top:8px;right:14px;width:8px;height:8px;border-radius:50%;background:#ffa83a;animation:seaPing 1.8s infinite}
 @keyframes seaPing{0%{box-shadow:0 0 0 0 rgba(255,168,58,.7)}100%{box-shadow:0 0 0 10px rgba(255,168,58,0)}}
 #vPredict .fl{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;margin:6px 0 0;padding:5px 8px;border-radius:9px;background:#fff;border:1px solid rgba(228,214,188,.8);font-size:11px;color:var(--muted);cursor:help}
@@ -374,7 +391,9 @@ body:not(.vmode) #hud .hint{display:none}
 #vBottom{position:absolute;z-index:3;left:18px;bottom:18px;top:auto;right:auto;transform:none;padding:0;background:none !important;border:0 !important;box-shadow:none !important}
 /* modals sit on a scrim; the panels step back */
 #scrim{position:absolute;inset:0;background:rgba(16,34,40,.32);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .4s}
-#village.modal #scrim{opacity:1;pointer-events:auto}
+#village.modal #scrim{z-index:4;opacity:1;pointer-events:auto}
+#village.modal .vcard.on{z-index:5}
+#village.modal #vTop .dl{visibility:hidden}
 #village.modal #vSide,#village.modal #vBottom{opacity:.0;pointer-events:none}
 .vcard{background:var(--paper)}
 .vcard .kicker{font-size:11px;letter-spacing:.14em;text-transform:none;font-weight:600;color:var(--teal);opacity:1}
@@ -382,13 +401,22 @@ body:not(.vmode) #hud .hint{display:none}
 .vcard h3{font-size:24px}
 #vEvent .opts button{box-shadow:0 3px 0 #E2D5BC;transition:transform .12s,box-shadow .12s,border-color .2s;border:1.5px solid var(--edge);background:#fff}
 #vEvent .opts button:hover{border-color:var(--teal);background:#F2FBFA} #vEvent .opts button:active{transform:translateY(2px);box-shadow:0 1px 0 #E2D5BC}
-.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 12px}
+#vReport{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 50px);overscroll-behavior:contain}
+#village.modal{z-index:9}
+.tiles{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;margin:6px 0}
 .tiles div{background:#fff;border:1px solid var(--edge);border-radius:12px;padding:9px 10px}
 .tiles small{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
 .tiles b{display:block;font:600 20px Inter,sans-serif;margin-top:3px;font-variant-numeric:tabular-nums}
 .tiles em{font:600 12px Inter,sans-serif;font-style:normal}
-.tiles .oc{display:grid;grid-template-columns:auto 1fr 36px;gap:4px;white-space:nowrap;align-items:center;font-size:11px;margin-top:3px;color:var(--muted)}
-.tiles .oc b{font:600 12px Inter,sans-serif;margin:0;text-align:right;color:var(--ink)}
+#vReport .vledger{display:flex;flex-wrap:wrap;gap:2px 14px;margin:0 0 12px;font-variant-numeric:tabular-nums}
+.sea-report{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:12px;font-variant-numeric:tabular-nums;text-align:left}
+.sea-report caption{text-align:left;font-weight:700;margin:0 0 5px}
+.sea-report th,.sea-report td{padding:5px 3px;border-bottom:1px solid var(--edge)}
+.sea-report thead th,.sea-report th small{font-size:10px;color:var(--muted);font-weight:500}
+.sea-report th small{display:block}.sea-report td:nth-child(2){white-space:nowrap}
+#vReport .sea-report td:last-child{text-align:left}
+.sea-report th small.negc{color:var(--coral-d)}
+#vReport .btns{position:sticky;bottom:0;padding:7px 0 4px;background:var(--paper)}
 .vcard .notes{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:5px}
 .vcard .notes li{display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.5;padding:6px 8px;border-radius:9px;background:rgba(246,239,226,.8)}
 .vcard .notes li.bad{background:rgba(233,118,91,.12)} .vcard .notes li.good{background:rgba(78,154,107,.12)}
@@ -493,6 +521,7 @@ body:not(.vmode) #bInfo,body:not(.vmode) #bTag{display:none}
 #coach.b::after{bottom:-8px;right:40px;border-left:0;border-top:0}
 .ring{position:fixed;z-index:34;border:2px solid var(--gold);border-radius:16px;pointer-events:none;animation:ringp 1.6s infinite;opacity:0;transition:opacity .3s}
 .ring.on{opacity:1}
+body:not(.vmode) :is(#coach,#ring),body:has(#village.zooming,#village.modal,#village.running) :is(#coach,#ring){visibility:hidden}
 @keyframes ringp{0%,100%{box-shadow:0 0 0 0 rgba(232,176,75,.5)}50%{box-shadow:0 0 0 8px rgba(232,176,75,0)}}
 /* dive HUD: the same family, dark sea glass */
 #keys{background:var(--glass);border:1px solid var(--glass-edge);border-radius:12px;padding:9px 12px;backdrop-filter:blur(8px);font-size:12px;line-height:2.1;max-width:300px;text-align:left}
@@ -517,3 +546,182 @@ body.vmode .coin{font-family:Inter,"Noto Sans SC",sans-serif;font-weight:700;fon
 /* on the shore, tips sit in the gap between the left panels (~290px) and the right panel (~340px) */
 @media (min-width:700px){ body.vmode #toast{left:calc((100% - 50px)/2);max-width:min(560px,calc(100vw - 670px))} }
 @media (min-width:700px) and (max-width:1300px){ body.vmode #toast{font-size:20px} }
+
+/* Seasonal dives share the ocean canvas. Only the controls and destination labels sit above it. */
+#bayDive[hidden],#bayInvite[hidden],#bayShore[hidden]{display:none}
+#bayInvite{position:fixed;z-index:9;top:18px;left:50%;transform:translateX(-50%);background:#183c3b;color:#e2fcf0;border:1px solid #9adcc2;border-radius:24px;padding:9px 17px;cursor:pointer}
+.vmode #bayInvite,body:has(#sys.on) #bayInvite{display:none}
+#bayDive{position:fixed;inset:0;z-index:8;pointer-events:none;color:#f0f7ee;font:14px/1.5 Inter,"Noto Sans SC",sans-serif}
+#bayDive header,.bay-controls,#bayDive nav button{background:rgba(12,35,41,.91);border:1px solid rgba(156,222,201,.4);box-shadow:0 4px 20px #06272845}
+#bayDive header{position:absolute;left:20px;top:17px;width:min(390px,calc(100% - 220px));border-radius:12px;padding:12px 17px}
+#bayPlace,#bayKeys{font-size:11px;color:#acd9c8}
+#bayTitle{font-size:20px;font-weight:600;margin:2px 0}
+#bayHint{margin:0;font-size:13px;line-height:1.55}
+#bayDive nav{position:absolute;top:17px;right:18px;display:flex;gap:7px}
+#bayDive button,#bayShore button{cursor:pointer;font:inherit;pointer-events:auto}
+#bayDive nav button,#bayActions button{border-radius:18px;color:#edf9f3;padding:7px 13px;font-size:12px}
+.bay-controls{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 28px);box-sizing:border-box;border-radius:13px;padding:10px 16px;text-align:center}
+#bayStatus{font-size:13px;min-height:20px;color:#e8f4df}
+#bayActions{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:6px 0}
+#bayActions button{background:#305a59;border:1px solid #83ada1}
+#bayActions button:first-child{background:#a9e4ca;color:#173c39;border-color:#bcf3d9;font-weight:600}
+#bayDive button:hover,#bayDive button:focus-visible{filter:brightness(1.18);outline:2px solid #d3edbd;outline-offset:2px}
+#bayTargets{position:absolute;inset:0}
+.bay-point{position:absolute;transform:translate(-50%,0);border:1px solid #9fddcd;border-radius:5px;background:#123c45d9;color:#e6fff1;font-size:12px!important;padding:3px 8px;white-space:nowrap}
+.bay-point:before{content:"";position:absolute;top:-8px;left:50%;height:7px;border-left:1px solid #b5e1ce}
+.bay-point.near{background:#d7eac5;color:#123d38}
+body.bay-active :is(#village,#hud,#objective,#avatarCard,#keys,#ptr,#surfaceBtn,#swap,#toast,#diveObservations){visibility:hidden!important}
+body.bay-active #bayDive nav{right:68px}
+@media(max-width:650px){body.bay-active #sysBtn{top:auto;bottom:100px;right:10px}body.bay-active #bayDive nav{right:8px}}
+#bayShore,.bay-report{padding:11px 12px;margin-bottom:12px;border:1px solid #9cc6b6;border-radius:9px;background:#e4f1e8;color:#224b47}
+#bayShore b,.bay-report b{font-size:14px}
+#bayShore p,.bay-report p{font-size:12px;line-height:1.5;margin:4px 0;color:#395b53}
+#bayShore button{font-size:11px;border:1px solid #8eafa2;border-radius:6px;background:#f7fbf5;color:#204e47;margin:3px 4px 1px 0;padding:4px 7px}
+#bayShore button[aria-pressed=true]{background:#245d53;color:white}
+#bayShore button:disabled{opacity:.52;cursor:default}
+#bayShore small,.bay-report small{display:block;font-size:11px;line-height:1.5;margin-top:5px}
+.bay-routine{margin-top:6px;border-top:1px solid #bad7c9;padding-top:4px}
+@media(max-width:650px){#bayDive header{left:10px;top:9px;padding:8px 11px;width:calc(100% - 124px);box-sizing:border-box}#bayTitle{font-size:16px}#bayDive nav{top:9px;right:8px;flex-direction:column;gap:4px}#bayHint,#bayStatus{font-size:12px}.bay-controls{bottom:8px;padding:5px 8px}#bayActions{gap:3px;margin:3px 0}#bayKeys{font-size:10px}}
+
+/* The title uses the same composition with either language and with a saved game. */
+.locale-pending #intro{visibility:hidden}
+#intro{box-sizing:border-box;overflow-y:auto;justify-content:safe center;padding:24px 18px}
+#intro>*{flex-shrink:0;max-width:100%;box-sizing:border-box}
+#intro .tmenu{min-width:0;width:min(100%,450px)}
+#intro .tb{max-width:100%;white-space:normal}
+#intro:not(.load-error) #tRetry,#intro.load-error #go{display:none}
+#intro .tb:disabled{opacity:.6;cursor:wait}
+#intro .trow{flex-wrap:wrap;justify-content:center}
+#intro .how{max-width:64ch;line-height:1.5;text-wrap:balance}
+#intro .devtag{position:static;transform:none;white-space:normal;line-height:1.4;margin-top:18px}
+#intro .language-choice{display:inline-flex;gap:3px;padding:3px;margin:0 0 4px;border:1px solid #9ccac558;border-radius:30px;background:#0b2a31a6}
+.language-choice button{font:600 13px/1.2 Inter,"Noto Sans SC",system-ui,sans-serif;color:#cee0dd;border:1px solid transparent;background:none;border-radius:24px;min-height:36px;min-width:80px;padding:6px 15px;cursor:pointer}
+.language-choice button[aria-pressed=true]{background:#baddd3;color:#123c3b}
+.language-choice button:hover{border-color:#a3d9d3}
+#intro button:focus-visible{outline:2px solid #e6edb6;outline-offset:3px}
+html[lang=en] #intro .en{display:none}
+html[lang=en] #intro h1{font-size:clamp(44px,7.4vw,100px);text-wrap:balance;letter-spacing:-.025em;line-height:1.02}
+html[lang=en] #intro .kicker{letter-spacing:.25em}
+html[lang=en] #intro :is(.tb,.how),html[lang=en] :is(#vTabs button,#surfaceBtn,.endBtns button){letter-spacing:.035em}
+@media(max-height:630px){
+  #intro{padding-block:12px}#intro .kicker{margin-bottom:8px}
+  #intro p{font-size:17px;margin:12px 0 16px}#intro .tmenu{gap:6px}
+  #intro .how,#intro .devtag{margin-top:10px}
+  #intro .tb,#intro .tb.primary{padding:9px 20px}
+}
+
+/* Let long forecast warnings and reports wrap, with a separate scroll area for decisions. */
+#vTop,#vSide{box-sizing:border-box}
+#vTop{width:268px}
+#vTabs,#vRun{flex-shrink:0}
+#vBody{min-height:0;min-width:0;overscroll-behavior:contain}
+#vPredict{flex:0 1 auto;max-height:44%;min-height:0;overflow:auto;overscroll-behavior:contain}
+#vPredict .warns{height:auto;overflow:visible;padding-bottom:2px}
+#vPredict .warns span{white-space:normal;overflow:visible}
+#vPredict .pt{flex-wrap:wrap}
+#vPredict .sea .sc{grid-template-columns:repeat(3,minmax(0,1fr))}
+#vSide .ic,.notes .ic{flex-shrink:0}
+#vBuild{grid-template-columns:repeat(2,minmax(0,1fr))}
+#vBuild .bc{min-width:0}
+#vBuild .bt{flex-wrap:wrap;row-gap:2px}
+#vPol .pseg{grid-auto-columns:minmax(0,1fr)}
+#vPol .pseg button{min-width:0;overflow-wrap:anywhere}
+html[lang=en] #vSide{width:clamp(320px,28vw,400px)}
+html[lang=en] #hud{width:268px}
+html[lang=en] #hud .m{grid-template-columns:57px minmax(14px,1fr) 34px 29px;gap:6px}
+html[lang=en] #vPol .ph b{letter-spacing:0}
+html[lang=en] .tier small{white-space:normal}
+html[lang=en] .ltab .ld em{width:auto;margin-right:.5em}
+@media(max-height:760px){
+  html[lang=en] #vPredict .pt::after{content:'Hover for details'}
+  html[lang=en] #vPredict:is(.preview,:hover) .pt::after{content:none}
+}
+.vcard,.vcard .btns button,#vReport .tiles div,#sysCard,.bay-controls,#bayDive header{overflow-wrap:break-word}
+.vcard .btns,.slot,.set{flex-wrap:wrap}
+.set>div{flex:1 1 140px}.slot .sa{margin-left:auto}
+#vEvent,#vPrompt,#vReport,#sysCard,#ending .inner,#bInfo,#card{max-height:calc(100dvh - 28px);overflow-y:auto}
+#ending .inner{max-width:min(640px,100%)}
+#ending.on{z-index:10;box-sizing:border-box;padding-block:60px 12px}
+#ending.on .inner{max-height:calc(100dvh - 72px)}
+body:has(#ending.on) #village.over{z-index:11}
+@media(max-width:1230px){
+  body:has(#ending.on) :is(#vTop,#hud){visibility:hidden}
+}
+#chart svg,#chart canvas{max-width:100%;height:auto}
+#chartCap .ct{display:inline;font:inherit;letter-spacing:inherit}
+#tip,#coach{box-sizing:border-box;max-width:min(280px,calc(100vw - 20px))}
+.bay-point{box-sizing:border-box;max-width:min(44vw,240px);white-space:normal;text-align:center;line-height:1.2}
+#bayDive header{box-sizing:border-box}
+body.bay-active #sysBtn{top:14px;bottom:auto;right:12px}
+#playUI,#diveReadout{display:contents}
+body.started:not(.vmode) #village{visibility:hidden}
+#shorePanels,#diveInfoToggle{display:none}
+
+/* On smaller screens one shore panel is open at a time so the island and Dive stay accessible. */
+@media(max-width:900px),(max-height:600px){
+  body{--shore-height:clamp(220px,49dvh,430px);--sheet-width:clamp(290px,43vw,380px)}
+  #village.on:not(.running,.modal,.over,.zooming) #shorePanels{display:grid}
+  #shorePanels{position:absolute;pointer-events:auto;left:8px;right:8px;bottom:var(--shore-height);grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:4px;background:var(--paper);border:1px solid var(--edge);border-radius:12px}
+  #shorePanels button{min-width:0;min-height:34px;padding:4px 2px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:600 12px/1.2 Inter,"Noto Sans SC",sans-serif;cursor:pointer}
+  #shorePanels button[aria-pressed=true]{background:var(--teal);color:white}
+  #village #vSide,#village #vTop,body.vmode #hud{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:none;height:calc(var(--shore-height) - 12px);box-sizing:border-box;transition:opacity .3s}
+  body.vmode #hud,#village #vTop{overflow:auto}
+  body.vmode:not([data-shore-view=ocean]) #hud,body.vmode:not([data-shore-view=village]) #vTop,body.vmode:is([data-shore-view=village],[data-shore-view=ocean]) #vSide{display:none}
+  body.vmode #vSide #vPredict{display:none}
+  body.vmode[data-shore-view=forecast] #vSide #vPredict{display:block;flex:1 1 0;max-height:none}
+  body.vmode[data-shore-view=forecast] :is(#vTabs,#vBody){display:none}
+  body.vmode #vPredict :is(.sm,.fl){max-height:none;opacity:1}
+  body.vmode #vPredict .fl{margin-top:6px;padding:5px 8px;border-width:1px}
+  html body.vmode #vPredict .pt::after{content:none}
+  #vTabs button{padding:7px}#vBody{padding:8px 10px 4px}#vRun{margin:6px 10px 9px;width:calc(100% - 20px);padding:8px}
+  #village #vClock{top:8px;left:8px;transform:none;padding:3px;gap:2px}
+  #vClock button{padding:6px}#clockT{min-width:36px;font-size:12px}
+  #vBottom{left:auto;right:8px;top:8px;bottom:auto}
+  #vBottom #vDive{font-size:12px;letter-spacing:0;padding:8px 12px;min-height:36px}
+  #bInfo{bottom:calc(var(--shore-height) + 50px);left:8px;max-height:calc(100dvh - var(--shore-height) - 100px)}
+  body.vmode #toast{bottom:calc(var(--shore-height) + 52px);left:50%;width:max-content;max-width:calc(100vw - 32px);font-size:17px}
+  body.vmode:has(#village.modal,#village.over) #hud{visibility:hidden}
+  .vcard,#vReport{padding:16px 14px 12px}
+  #vReport .btns{display:flex;flex-wrap:wrap;gap:6px}
+  #vReport .btns button{padding:8px 12px;letter-spacing:0}
+  #bInfo .bh{flex-wrap:wrap}
+  body.started:not(.bay-active,.vmode) #diveInfoToggle{display:block;position:fixed;top:8px;left:8px;z-index:9;border:1px solid #89b1a8;border-radius:18px;background:#193d40;color:#e7f9f3;padding:8px 10px;min-height:36px;cursor:pointer}
+  body:not(.vmode) #bayInvite{top:8px;left:100px;right:58px;max-width:360px;transform:none;text-align:left;font-size:12px;line-height:1.3;padding:7px 10px}
+  body:not(.vmode) #sysBtn{top:8px;right:8px;width:36px;height:36px}
+  body:not(.vmode,.dive-notes-open) #diveReadout :is(#hud,#keys,.ab,.ak){display:none}
+  body:not(.vmode) #avatarCard{bottom:8px;left:8px;max-width:47vw;box-sizing:border-box;padding:6px 10px}
+  body:not(.vmode) #avatarCard .an{font-size:16px;letter-spacing:0}
+  #avatarCard .air i{max-width:100%}
+  body:not(.vmode) #surfaceBtn{left:auto;right:8px;bottom:8px;transform:none;max-width:47vw;padding:10px;font-size:11px}
+  body.dive-notes-open:not(.vmode,.bay-active) #diveReadout{display:flex;flex-direction:column;gap:5px;position:fixed;z-index:8;left:8px;top:58px;bottom:auto;max-height:calc(100dvh - 120px);width:min(360px,calc(100vw - 16px));overflow:auto;overscroll-behavior:contain}
+  body.dive-notes-open:not(.vmode,.bay-active) #diveReadout :is(#hud,#keys,#avatarCard){position:static;display:block;box-sizing:border-box;width:100%;max-width:none;flex-shrink:0;margin:0;opacity:1;background:#102e35f5}
+  body:not(.vmode) #toast{bottom:85px;max-width:calc(100vw - 32px);width:max-content;font-size:18px}
+}
+@media(min-width:660px) and (max-width:900px),(min-width:660px) and (max-height:600px){
+  #shorePanels{left:auto;right:8px;width:var(--sheet-width);box-sizing:border-box;top:8px;bottom:auto}
+  #village #vSide,#village #vTop,body.vmode #hud{left:auto;right:8px;top:56px;bottom:8px;height:auto;width:var(--sheet-width)}
+  #vBottom{left:8px;right:auto;bottom:8px;top:auto}
+  body.vmode #toast{left:calc((100vw - var(--sheet-width))/2);max-width:calc(100vw - var(--sheet-width) - 38px);bottom:55px}
+  #bInfo{bottom:56px;max-height:calc(100dvh - 112px);max-width:calc(100vw - var(--sheet-width) - 24px)}
+}
+@media(min-width:901px) and (max-width:1080px){
+  #vClock{left:calc(50% - 28px);gap:4px;padding:4px}
+  #vClock button{padding:5px 7px}
+}
+@media(max-width:650px){
+  #bayDive header{width:calc(100% - 142px);max-height:38dvh;overflow:auto;pointer-events:auto}
+  #bayDive nav,body.bay-active #bayDive nav{right:8px;top:50px;width:116px}
+  #bayDive nav button{padding:4px 9px;min-height:32px;line-height:1.2}
+  body.bay-active #sysBtn{top:8px;right:8px;bottom:auto}
+  .bay-controls{max-height:36dvh;overflow:auto;pointer-events:auto}
+  #vReport .sea-report{font-size:11px}#vReport .tiles b{font-size:17px}
+  #sys{padding:8px}#sysCard{padding:14px 12px}
+  #ending .inner{padding:16px}#ending p{font-size:17px}
+}
+@media(max-width:390px){
+  #vClock #wxName{display:none}
+}
+@media(max-width:370px){
+  #intro .trow{gap:5px}#intro .trow .tb{padding:8px 10px}
+  #vReport .tiles{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}

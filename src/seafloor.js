@@ -17,8 +17,13 @@
       rip = rip * rip;
       float slope = 1.0 - normalize(vN).y;
       float rk = smoothstep(0.11, 0.26, slope + (fbm2(p * 0.18) - 0.5) * 0.2);
-      float strata = sin(vW.y * 2.3 + fbm2(p * 0.06) * 5.0) * 0.5 + 0.5;
-      float h = mix(rip * 0.5 + fbm2(p * 0.35) * 0.45 + vnoise(p * 7.0) * 0.05, strata * 0.6 + fbm2(p * 1.3) * 0.7, rk);
+      float strata = 0.0, sandHeight = 0.0, rockHeight = 0.0;
+      if(rk < 1.0) sandHeight = rip * 0.5 + fbm2(p * 0.35) * 0.45 + vnoise(p * 7.0) * 0.05;
+      if(rk > 0.0){
+        strata = sin(vW.y * 2.3 + fbm2(p * 0.06) * 5.0) * 0.5 + 0.5;
+        rockHeight = strata * 0.6 + fbm2(p * 1.3) * 0.7;
+      }
+      float h = mix(sandHeight, rockHeight, rk);
       vec3 n = bump(normalize(vN), vW, h, mix(0.42, 0.9, rk) * exp(-d * 0.018));
       float pn = fbm2(p * 0.028);
       vec3 sand = mix(vec3(0.66, 0.59, 0.46), vec3(0.80, 0.75, 0.64), smoothstep(0.3, 0.7, pn));
@@ -27,17 +32,23 @@
       sand = mix(sand, sand * vec3(0.55, 0.5, 0.48), speck * 0.6);
       vec3 silt = mix(vec3(0.30, 0.31, 0.23), vec3(0.41, 0.40, 0.29), pn) * (0.9 + 0.1 * rip);
       vec3 alb = mix(silt, sand, smoothstep(0.0, 1.0, uHealth));
-      vec3 rockC = mix(vec3(0.17, 0.165, 0.16), vec3(0.37, 0.33, 0.28), strata * 0.6 + fbm2(p * 0.9) * 0.4);
-      vec3 crust = mix(vec3(0.66, 0.36, 0.44), vec3(0.4, 0.5, 0.28), fbm2(p * 0.4 + 3.0));
-      rockC = mix(rockC, crust * 0.8, smoothstep(0.45, 0.68, fbm2(p * 0.55 - 7.0)) * 0.75 * uHealth);
       float rub = smoothstep(0.07, 0.15, slope) * (1.0 - rk) * step(0.55, hash12(floor(p * 2.6)));
       alb = mix(alb, alb * 0.68 + vec3(0.05, 0.045, 0.04), rub * 0.6);
-      alb = mix(alb, rockC, rk);
+      if(rk > 0.0){
+        vec3 rockC = mix(vec3(0.17, 0.165, 0.16), vec3(0.37, 0.33, 0.28), strata * 0.6 + fbm2(p * 0.9) * 0.4);
+        vec3 crust = mix(vec3(0.66, 0.36, 0.44), vec3(0.4, 0.5, 0.28), fbm2(p * 0.4 + 3.0));
+        rockC = mix(rockC, crust * 0.8, smoothstep(0.45, 0.68, fbm2(p * 0.55 - 7.0)) * 0.75 * uHealth);
+        alb = mix(alb, rockC, rk);
+      }
       vec3 col = shade(alb, n, vW, 1.0 - 0.25 * rk);
       gl_FragColor = vec4(fogged(col, vW), 1.0);
     }`,
   }));
   scene.add(floor);
+  const depth = new THREE.Mesh(g, new THREE.ShaderMaterial({
+    vertexShader: floor.material.vertexShader, fragmentShader: DEPTH_FRAG, colorWrite: false,
+  }));
+  depth.layers.set(BAY_DEPTH_LAYER); depth.renderOrder = -24; scene.add(depth);
 }
 
 // ======================================================================= reef layout: patches with coral-covered bommies
@@ -202,6 +213,10 @@ void main(){
   gl_FragColor = vec4(fogged(col, vW), 1.0);
 }`;
 const reefMat = (defines) => mat({ defines, side: THREE.DoubleSide, vertexShader: REEF_VERT, fragmentShader: REEF_FRAG });
+// Solid reef shapes can fill camera depth before the sand and coral run their expensive colour shaders.
+// Use the same vertex transform and shoreline cut as their colour pass, including at the waterline.
+const reefDepthMat = mat({ side: THREE.DoubleSide, vertexShader: REEF_VERT, colorWrite: false,
+  fragmentShader: COMMON + 'varying vec3 vW; void main(){ clipPortal(vW); gl_FragColor = vec4(1.0); }' });
 
 const dummy = new THREE.Object3D();
 function put(list, x, y, z, s, color, patch, o = {}){
@@ -212,19 +227,36 @@ function put(list, x, y, z, s, color, patch, o = {}){
   dummy.updateMatrix();
   list.push({ m: dummy.matrix.clone(), c: color, patch, rnd: rng() });
 }
-function makeInstanced(geo, material, list, cast = true){
-  const g = geo.clone(), n = list.length;
+function instanceGeometry(base){
+  const g = new THREE.BufferGeometry();
+  g.setIndex(base.index);
+  for(const [name, attribute] of Object.entries(base.attributes)) g.setAttribute(name, attribute);
+  if(!base.boundingSphere) base.computeBoundingSphere();
+  g.boundingSphere = base.boundingSphere.clone();
+  return g;
+}
+function makeInstanced(geo, material, list, shadowLayer = LIVE_SHADOW){
+  const g = instanceGeometry(geo), n = list.length;
   const col = new Float32Array(n*3), pa = new Float32Array(n), rn = new Float32Array(n);
   const mesh = new THREE.InstancedMesh(g, material, n);
   list.forEach((it, i) => { mesh.setMatrixAt(i, it.m); col.set([it.c.r, it.c.g, it.c.b], i*3); pa[i] = it.patch; rn[i] = it.rnd; });
   g.setAttribute('aColor', new THREE.InstancedBufferAttribute(col, 3));
   g.setAttribute('aPatch', new THREE.InstancedBufferAttribute(pa, 1));
   g.setAttribute('aRnd', new THREE.InstancedBufferAttribute(rn, 1));
-  mesh.frustumCulled = false; scene.add(mesh); if(cast) caster(mesh); return mesh;
+  mesh.frustumCulled = false; scene.add(mesh);
+  if(shadowLayer) caster(mesh, shadowLayer);
+  const d = material.defines;
+  if(shadowLayer === FIXED_REEF_SHADOW && (d.ROCK || d.BRAIN || d.TABLE || d.BRANCH)){
+    mesh.computeBoundingSphere(); mesh.frustumCulled = true;
+    const depth = new THREE.InstancedMesh(g, reefDepthMat, 0);
+    depth.instanceMatrix = mesh.instanceMatrix; depth.count = n; depth.boundingSphere = mesh.boundingSphere;
+    depth.renderOrder = -20; scene.add(depth);
+  }
+  return mesh;
 }
 
 // ---------------------------------------------------------------- reef geometry
-function branchCoralGeo(){
+function branchCoralGeometry(){
   const parts = [], M = () => new THREE.Matrix4();
   (function grow(m, len, rad, depth){
     const g = new THREE.CylinderGeometry(rad*0.66, rad, len, 6, 2); g.translate(0, len/2, 0); g.applyMatrix4(m); parts.push(g);
@@ -237,7 +269,16 @@ function branchCoralGeo(){
       grow(c, len*0.74, rad*0.7, depth-1);
     }
   })(M(), 0.9, 0.17, 4);
-  return mergeGeometries(parts.map(g => g.toNonIndexed()));
+  return mergeGeometries(parts);
+}
+function plantBranches(list, material){
+  const geometry = branchCoralGeometry(), cells = new Map();
+  for(const plant of list){
+    const m = plant.m.elements, key = Math.floor(m[12]/40) + ',' + Math.floor(m[14]/40);
+    if(!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(plant);
+  }
+  for(const plants of cells.values()) makeInstanced(geometry, material, plants, FIXED_REEF_SHADOW);
 }
 function brainGeo(){
   const g = new THREE.SphereGeometry(1, 28, 18), p = g.attributes.position;
@@ -253,22 +294,22 @@ function tableGeo(){
     plate(1.5, 0.98, 0, 0), plate(0.95, 1.38, 0.45, 0.3), plate(0.6, 1.7, -0.3, -0.2),
     new THREE.CylinderGeometry(0.09, 0.13, 0.42, 6).translate(0.45, 1.16, 0.3),
     new THREE.CylinderGeometry(0.07, 0.1, 0.36, 6).translate(-0.3, 1.52, -0.2),
-  ].map(g => g.toNonIndexed()));
+  ]);
 }
 function tubeGeo(){
   const parts = [];
   for(let i=0;i<5;i++){ const h = 0.9 + rng()*1.4;
     const g = new THREE.CylinderGeometry(0.22 + rng()*0.1, 0.13, h, 12, 3, true).translate(0, h/2, 0);
-    g.rotateZ((rng()-.5)*0.6); g.rotateY(rng()*6.283); g.translate((rng()-.5)*0.5, 0, (rng()-.5)*0.5); parts.push(g.toNonIndexed()); }
+    g.rotateZ((rng()-.5)*0.6); g.rotateY(rng()*6.283); g.translate((rng()-.5)*0.5, 0, (rng()-.5)*0.5); parts.push(g); }
   return mergeGeometries(parts);
 }
 function anemoneGeo(){
-  const parts = [new THREE.CylinderGeometry(0.34, 0.4, 0.3, 14).translate(0, 0.15, 0).toNonIndexed()];
+  const parts = [new THREE.CylinderGeometry(0.34, 0.4, 0.3, 14).translate(0, 0.15, 0)];
   for(let i=0;i<34;i++){
     const a = rng()*6.283, r = Math.sqrt(rng())*0.32, len = 0.45 + rng()*0.25;
     const g = new THREE.CylinderGeometry(0.018, 0.04, len, 5, 4).translate(0, len/2, 0);
     g.rotateZ(r*1.6); g.rotateY(a); g.translate(Math.cos(a)*r, 0.28, -Math.sin(a)*r);
-    parts.push(g.toNonIndexed());
+    parts.push(g);
   }
   return mergeGeometries(parts);
 }
@@ -285,9 +326,9 @@ function clamGeo(){
   g.computeVertexNormals(); return g;
 }
 function urchinGeo(){
-  const parts = [new THREE.SphereGeometry(0.35, 12, 8).toNonIndexed()];
+  const parts = [new THREE.SphereGeometry(0.35, 12, 8)];
   for(let k=0;k<46;k++){ const u = rng()*2 - 1, a = rng()*Math.PI*2, d = new THREE.Vector3(Math.sqrt(1 - u*u)*Math.cos(a), Math.abs(u)*0.9 + 0.1, Math.sqrt(1 - u*u)*Math.sin(a)).normalize();
-    const c = new THREE.ConeGeometry(0.03, 0.9, 4).translate(0, 0.62, 0); c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d)); parts.push(c.toNonIndexed()); }
+    const c = new THREE.ConeGeometry(0.03, 0.9, 4).translate(0, 0.62, 0); c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d)); parts.push(c); }
   return mergeGeometries(parts);
 }
 const fanGeo = new THREE.CircleGeometry(1.6, 18, Math.PI*0.12, Math.PI*0.76);
@@ -346,17 +387,18 @@ const ANEMONE_SPOTS = [];
   for(let k=0;k<70;k++){ const a = rng()*6.283, r = Math.sqrt(rng())*150, x = Math.cos(a)*r, z = Math.sin(a)*r; if(heightAt(x, z) > SURFACE - 2) continue;
     put(star, x, heightAt(x, z), z, 0.22 + rng()*0.2, [new THREE.Color('#ff6a2a'), new THREE.Color('#3d6bff'), new THREE.Color('#e8342e')][k%3], 13, { tilt: 0.1 }); }
 
-  branch.forEach(l => makeInstanced(branchCoralGeo(), reefMat({ BRANCH: 1 }), l));
-  makeInstanced(brainGeo(), reefMat({ BRAIN: 1 }), brain);
-  makeInstanced(tableGeo(), reefMat({ TABLE: 1 }), table);
-  makeInstanced(tubeGeo(), reefMat({ TUBE: 1 }), tube);
+  const branchMaterial = reefMat({ BRANCH: 1 });
+  branch.forEach(plants => plantBranches(plants, branchMaterial));
+  makeInstanced(brainGeo(), reefMat({ BRAIN: 1 }), brain, FIXED_REEF_SHADOW);
+  makeInstanced(tableGeo(), reefMat({ TABLE: 1 }), table, FIXED_REEF_SHADOW);
+  makeInstanced(tubeGeo(), reefMat({ TUBE: 1 }), tube, FIXED_REEF_SHADOW);
   makeInstanced(fanGeo, reefMat({ FAN: 1, SWAY: '0.035' }), fan);
   makeInstanced(anemoneGeo(), reefMat({ ANEMONE: 1 }), anem);
   makeInstanced(starGeo(), reefMat({ STAR: 1 }), star, false);
-  makeInstanced(clamGeo(), reefMat({ CLAM: 1 }), clam);
-  makeInstanced(urchinGeo(), reefMat({ URCHIN: 1 }), urchin);
-  makeInstanced(rockGeometry(14, 0.5), reefMat({ ROCK: 1 }), rock);
-  makeInstanced(rockGeometry(30, 0.22), reefMat({ ROCK: 1 }), bommie);
+  makeInstanced(clamGeo(), reefMat({ CLAM: 1 }), clam, FIXED_REEF_SHADOW);
+  makeInstanced(urchinGeo(), reefMat({ URCHIN: 1 }), urchin, FIXED_REEF_SHADOW);
+  makeInstanced(rockGeometry(14, 0.5), reefMat({ ROCK: 1 }), rock, FIXED_REEF_SHADOW);
+  makeInstanced(rockGeometry(30, 0.22), reefMat({ ROCK: 1 }), bommie, FIXED_REEF_SHADOW);
   makeInstanced(kelpGeo, reefMat({ KELP: 1 }), kelp);
 }
 

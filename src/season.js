@@ -2,6 +2,22 @@
 function seasonStep(){
   const pre = { season: V.season, money: V.money, morale: V.morale, food: V.food, pol: { ...V.pol }, built: V.built.slice().concat((V.ups || []).map(u => 'up:' + u.k)), spent: V.buildSpent || 0, ev: V.evLog || null };
   const { e, v, r } = simulateSeason(eco, V, pendingHaul);
+  if(V.sea?.season === V.season && V.sea.bayFinding){
+    const finding = (r.bayJob && V.sea.bayApproved) || V.sea.bayFinding;
+    const baseline = r.bayJob ? simulateSeason(eco, { ...V, sea: { ...V.sea, bayPlan: '' } }, pendingHaul) : { v, r, e };
+    r.bayDive = { title: finding.title, note: finding.note, job: r.bayJob,
+      cash: r1(v.money - baseline.v.money), catch: r1(r.catchT - baseline.r.catchT),
+      guests: r1(r.allVis - baseline.r.allVis), fish: r1((e.fish - baseline.e.fish)*100),
+      imports: r1((r.shortage - baseline.r.shortage)*REC.food), waste:r1((r.nutr-baseline.r.nutr)*100),
+      recovered:r.bayRecovered };
+    if(V.season === 15) v.bay.ending = V.sea.bayFinding.note;
+  }
+  const start = V.planStart ?? pre.money + pre.spent;
+  r.treasury = {
+    start, end: v.money, net: r1(v.money - start), operating: r1(v.money - pre.money),
+    building: -pre.spent, events: r1(pre.money + pre.spent - start)
+  };
+  r.ocean = seasonOceanReport(V.planOcean || oceanSnapshot(eco), e, r, V.mods || {});
   pendingHaul = 0;
   Object.assign(eco, e); Object.assign(V, v);
   if(r.reefDmg > 0) for(let n=0;n<V.trawlers;n++) scar[(rng()*13)|0] = 0.55; else for(let i=0;i<13;i++) scar[i] *= 0.6;
@@ -11,7 +27,40 @@ function seasonStep(){
   V.prevPol = { ...V.pol }; V.mods = {};
   for(const k in V.locks){ if(--V.locks[k] <= 0) delete V.locks[k]; }
   logSeason(pre, r);
+  // A dive from the report already visits the coming season and can spend village funds.
+  V.planStart = v.money;
+  V.planOcean = oceanSnapshot(e);
   return r;
+}
+const OCEAN_METRICS = [
+  { key: 'coral', label: '珊瑚', goal: 0.55 }, { key: 'fish', label: '鱼群', goal: 0.55 },
+  { key: 'clar', label: '水质' }, { key: 'pelagic', label: '远洋鱼群', goal: OFF.okLine }
+];
+function oceanSnapshot(e){
+  return { coral: e.coral, fish: e.fish, clar: e.clar, pelagic: e.pelagic ?? 1 };
+}
+function seasonOceanReport(open, end, r, mods){
+  // Red tide and a real or unattended trawl can take effect before simulateSeason.
+  const bloom = mods.bloom ? Math.max(0.02, open.fish - 0.06) - open.fish : 0;
+  const trawlCoral = r.coralBefore - open.coral, trawlFish = r.fishBefore - open.fish - bloom;
+  if(Math.abs(trawlCoral) >= 0.0005) r.coralWhy.push(['拖网作业', trawlCoral]);
+  if(Math.abs(trawlFish) >= 0.0005) r.fishWhy.push(['拖网作业', trawlFish]);
+  if(bloom) r.fishWhy.push(['赤潮', bloom]);
+  const causes = {
+    coral: r.coralWhy, fish: r.fishWhy,
+    pelagic: [['自然繁殖', r.pelGrowth], ['远洋捕捞', -r.offCatch*OFF.deplete], ['季节洄游', r.sea?.dP || 0]]
+  };
+  return OCEAN_METRICS.map(({key, label, goal}) => {
+    const start = open[key], finish = end[key], change = finish - start;
+    let cause;
+    if(key === 'clar') cause = `${mods.bloom ? '赤潮，' : change > 0 ? '水质恢复，' : ''}入海污染 ${Math.round(r.nutr*100)}%`;
+    else {
+      const sameDirection = causes[key].filter(([, value]) => change*value > 0);
+      sameDirection.sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
+      cause = sameDirection[0]?.[0] || (r1(change*100) ? '多项小幅影响' : '持平');
+    }
+    return { key, label, goal, start, end: finish, cause };
+  });
 }
 // random events: each a small dilemma, rolled at the start of a season
 const EVENTS = [
@@ -49,8 +98,8 @@ const EV_TYPE = { storm: 'crisis', heat: 'crisis', price: 'chance', poach: 'cris
 function showEvent(ev, after){
   setState('event'); V.lastEvent = ev.id; (V.evAt = V.evAt || {})[ev.id] = V.season; $('village').classList.add('modal');
   const type = EV_TYPE[ev.id] || 'info';
-  $('vEvent').innerHTML = `<div class="kicker ${type}">${seasonName(V.season)} · ${type === 'crisis' ? '危机' : type === 'chance' ? '机会' : '消息'}</div><h3>${ev.t}</h3><p>${ev.x}</p>
-    <div class="opts">${ev.o.map((o, i) => `<button data-i="${i}"><b>${o.t}</b><span>${o.d}</span></button>`).join('')}</div>`;
+  setGameHTML($('vEvent'), `<div class="kicker ${type}">${seasonName(V.season)} · ${type === 'crisis' ? '危机' : type === 'chance' ? '机会' : '消息'}</div><h3>${ev.t}</h3><p>${ev.x}</p>
+    <div class="opts">${ev.o.map((o, i) => `<button data-i="${i}"><b>${o.t}</b><span>${o.d}</span></button>`).join('')}</div>`);
   $('vEvent').querySelectorAll('button').forEach(b => b.onclick = () => { V.evLog = { t: ev.t, c: ev.o[+b.dataset.i].t }; ev.o[+b.dataset.i].go(); $('vEvent').classList.remove('on'); $('village').classList.remove('modal');
     setState('plan'); chime(3); renderVillageUI(); if(after) after(); });
   $('vEvent').classList.add('on'); renderVillageUI();

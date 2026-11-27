@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en" class="locale-pending">
 <head>
 <meta charset="utf-8">
-<title>海面之下</title>
+<title>Beneath the Surface</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="src/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@400;500&display=swap" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="stylesheet" href="src/style.css?v=0.2.1-dev">
 <script>window.__errs=[];addEventListener('error',e=>{const f=(e.filename||'').split('/').pop().split('?')[0];__errs.push(e.message+' @'+(f==='game.js'&&window.__srcMap?__srcMap(e.lineno):f+':'+e.lineno)+':'+e.colno);});</script>
 <script type="importmap">
 {"imports":{
@@ -15,8 +15,16 @@
 }}
 </script>
 </head>
-<body>
+<body data-shore-view="plan">
+<div id="playUI" inert>
 <canvas id="c"></canvas>
+<button id="bayInvite" class="btn" hidden></button>
+<section id="bayDive" aria-label="海湾现场" hidden>
+  <header><small id="bayPlace"></small><h2 id="bayTitle"></h2><p id="bayHint"></p></header>
+  <div id="bayTargets"></div>
+  <div class="bay-controls"><div id="bayStatus" role="status"></div><div id="bayActions"></div><small id="bayKeys"></small></div>
+  <nav><button id="bayFree">自由潜游</button><button id="bayReturn">返回岸上</button></nav>
+</section>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.2c-.6-.8-1.5-1.2-2.6-1.2-1.5 0-2.6.8-2.6 2s1.1 1.7 2.6 2 2.7.8 2.7 2.1-1.2 2-2.7 2c-1.2 0-2.2-.5-2.8-1.3M12 6.5V8M12 16v1.5"/></symbol>
 <symbol id="i-fish" viewBox="0 0 24 24"><path d="M3 12c3-4.2 8-5.2 12-3.2 1.8.9 3 2 4 3.2-1 1.2-2.2 2.3-4 3.2-4 2-9 1-12-3.2z"/><path d="M19 12l2.5-3.2v6.4z"/><circle cx="13.5" cy="11" r=".7" fill="currentColor"/></symbol>
@@ -61,16 +69,22 @@
 </defs></svg>
 
 
+<button id="diveInfoToggle" aria-controls="diveReadout" aria-expanded="false">潜水手记</button>
+<div id="diveReadout">
 <div id="hud">
-  <div class="ct"><svg class="ic"><use href="#i-wave"/></svg>海洋</div>
+  <div class="ct"><svg class="ic"><use href="#i-wave"/></svg>全海域海况</div>
   <div class="meters">
     <div class="m" data-tip="珊瑚礁的健康。被拖网刮过、被污水和热浪伤到会白化，受保护、水干净时会慢慢长回来。细竖线是 55% 的目标线。"><span>珊瑚</span><i><b id="mCoral"></b><em></em></i><var id="nCoral">100%</var><span id="tCoral" class="tr"></span></div>
     <div class="m" data-tip="鱼群数量。捕得比它繁殖得快就会减少；珊瑚越好，海里能养的鱼越多。"><span>鱼群</span><i><b id="mFish"></b><em></em></i><var id="nFish">100%</var><span id="tFish" class="tr"></span></div>
-    <div class="m" data-tip="海水清澈度。污水和游客垃圾会让水变浑；水越浑，珊瑚越难恢复，游客也越少。"><span>水质</span><i><b id="mWater"></b><em></em></i><var id="nWater">100%</var><span id="tWater" class="tr"></span></div>
+    <div class="m" data-tip="海水清澈度。污水和游客垃圾会让水变浑；水越浑，珊瑚越难恢复，游客也越少。"><span>水质</span><i><b id="mWater"></b></i><var id="nWater">100%</var><span id="tWater" class="tr"></span></div>
     <div class="m" data-tip="礁墙外的远洋鱼群。远洋渔船捕的就是它们，观鲸船看的也是它们。四年后要守在 40% 以上。"><span>远洋</span><i><b id="mPel"></b><em style="left:40%"></em></i><var id="nPel">100%</var><span id="tPel" class="tr"></span></div>
   </div>
-  <div class="hint">箭头＝本季预计变化，越多越大；<b>?</b>＝没潜下去调查。竖线＝四年后的目标。</div>
+  <div class="hint">箭头＝本季预计变化，越多越大； <b>?</b> ＝没潜下去调查。竖线＝四年后的目标。</div>
+  <div id="diveObservations"><b>水下观察</b><span>最近礁区健康 <strong id="localReef">—</strong></span><span data-tip="水下场景中的活跃鱼数占比，包含饵鱼群。">场中鱼量 <strong id="localFish">—</strong></span></div>
   <div id="objective"></div>
+</div>
+<div id="keys"><b>鼠标</b> 转向：左右转弯、上下爬升俯冲<br>点击画面锁定鼠标 &nbsp; <b>W</b><b>S</b> 加速 / 减速<br><b>空格</b> 动作 &nbsp; <b>F</b> 化身 &nbsp; <b>E</b> 上浮<br><b>M</b> 静音 &nbsp; <b>H</b> 隐藏说明</div>
+<div id="avatarCard"><div class="an"></div><div class="ab"></div><div class="ak"></div><div class="air">空气<i><b></b></i></div></div>
 </div>
 <button id="surfaceBtn">浮上水面 &nbsp;<kbd>E</kbd></button>
 <div id="year"></div>
@@ -81,9 +95,7 @@
   <div id="opts"></div>
   <div id="ledger"></div>
 </div>
-<div id="keys"><b>鼠标</b> 转向：左右转弯、上下爬升俯冲<br>点击画面锁定鼠标 &nbsp; <b>W</b><b>S</b> 加速 / 减速<br><b>空格</b> 动作 &nbsp; <b>F</b> 化身 &nbsp; <b>E</b> 上浮<br><b>M</b> 静音 &nbsp; <b>H</b> 隐藏说明</div>
 <div id="toast" class="serif"></div>
-<div id="avatarCard"><div class="an"></div><div class="ab"></div><div class="ak"></div><div class="air">空气<i><b></b></i></div></div>
 <div id="swap"><b>F</b><span></span></div>
 <div id="ptr"><div id="ptrRing"></div><div id="ptrArrow"></div><span id="ptrDist"></span></div>
 
@@ -97,9 +109,15 @@
 
 <div id="village">
   <div id="scrim"></div>
+  <nav id="shorePanels" aria-label="岸上面板">
+    <button data-view="village" aria-controls="vTop" aria-pressed="false">村庄</button>
+    <button data-view="ocean" aria-controls="hud" aria-pressed="false">海况</button>
+    <button data-view="plan" aria-controls="vBody" aria-pressed="true">规划</button>
+    <button data-view="forecast" aria-controls="vPredict" aria-pressed="false">预测</button>
+  </nav>
   <div id="vClock" class="panel"><button id="wxBtn" data-tip="点一下换天气。天气和昼夜只影响画面，不影响经营。"><svg class="ic"><use href="#i-sun"/></svg><span id="wxName">晴</span></button><span class="num" id="clockT">07:10</span><button id="clockBtn" data-tip="暂停或继续时间流动"><svg class="ic"><use href="#i-pause"/></svg></button><button id="menuBtn" data-tip="菜单：存档、游玩记录、设置（Esc）"><svg class="ic"><use href="#i-menu"/></svg></button></div>
   <div id="vTop" class="panel">
-    <div class="season"><svg class="ic" style="color:var(--teal)"><use href="#i-cal"/></svg><b id="vSeason">第 1 年 · 春</b><span class="turn num" id="vTurn">1 / 8</span></div>
+    <div class="season"><svg class="ic" style="color:var(--teal)"><use href="#i-cal"/></svg><b id="vSeason">第 1 年 · 春</b><span class="turn num" id="vTurn">1 / 16</span></div>
     <div id="vPips"></div><div class="yl"><span>第1年</span><span>第2年</span><span>第3年</span><span>第4年</span></div>
     <div class="tier" data-tip="村子的发展程度：房子、船、店、公共设施和人口都算。从高脚木屋的小渔村，到瓦顶小楼的渔镇，再到现代化的海滨小城。越发达，游客越多。"><svg class="ic"><use href="#i-house"/></svg><b id="vTier">小渔村</b><span class="tbar"><i id="vTierBar"></i></span><small id="vTierNext"></small></div>
     <div class="res">
@@ -112,7 +130,7 @@
   </div>
   <div id="vSide" class="panel">
     <div id="vTabs"><button data-t="pol" class="on"><svg class="ic"><use href="#i-scroll"/></svg>政策</button><button data-t="build"><svg class="ic"><use href="#i-hammer"/></svg>建设</button></div>
-    <div id="vBody"><div id="vPol"></div><div id="vBuild"></div></div>
+    <div id="vBody"><section id="bayShore" aria-label="海湾作业" hidden></section><section id="surveyAdvice" aria-label="调查后的政策选择" hidden></section><div id="vPol"></div><div id="vBuild"></div></div>
     <div id="vPredict"></div>
     <button id="vRun" class="btn primary"><svg class="ic"><use href="#i-play"/></svg><span>开始本季</span></button>
   </div>
@@ -125,31 +143,39 @@
     <div class="btns"><button id="pStay">留在岸上</button><button id="pDive" class="primary">潜下去</button></div>
   </div>
   <div id="vReport" class="panel vcard"></div>
-  <div id="montage" class="panel"><div class="ms"></div><div class="md"></div><div class="mb"><i></i></div></div>
+  <div id="montage" class="panel"><div class="ms"></div><div class="md"></div><div class="mb"><i></i></div><button id="skipMontage" class="btn" type="button" hidden>直接看季报</button></div>
 </div>
 <div id="marks"></div>
 <div id="fade"></div>
 <div id="tip"></div>
 <div id="coach"><b></b><div class="ctext"></div><div class="cbtn"><span class="cstep"></span><button>下一步</button></div></div>
 <div class="ring" id="ring"></div>
+</div>
 <div id="intro">
   <div class="kicker">一个靠海吃海的小渔村</div>
   <h1 class="serif">海面之下</h1>
   <div class="en">BENEATH THE SURFACE</div>
   <p class="serif">经营它，也守住它门前的珊瑚礁。<br>你在岸上做的每个决定，都会沉到海底。</p>
   <div class="tmenu">
+    <div class="language-choice" id="languageChoice" role="group" aria-label="界面语言">
+      <button type="button" data-language="en" data-native-language lang="en" aria-pressed="true">English</button>
+      <button type="button" data-language="zh-CN" data-native-language lang="zh-CN" aria-pressed="false">中文</button>
+    </div>
     <button id="tCont" class="tb primary" style="display:none">继续游戏<small id="tContInfo"></small></button>
-    <button id="go" class="tb">开始经营</button>
-    <div class="trow"><button id="tLoad" class="tb" style="display:none">读取存档</button><button id="tLog" class="tb" style="display:none">游玩记录</button><button id="tSet" class="tb">设置</button></div>
+    <button id="go" class="tb" disabled>正在载入海湾…</button>
+    <button id="tRetry" class="tb primary" onclick="location.reload()">加载失败，点击重试</button>
+    <div class="trow"><button id="tLoad" class="tb" style="display:none">读取存档</button><button id="tLog" class="tb" style="display:none">游玩记录</button><button id="tSet" class="tb" disabled>设置</button></div>
   </div>
   <div class="how">拖动旋转模型 · 点击水下发光的生物化身潜入 · 潜水时鼠标控制方向、W / S 加减速</div>
-  <div class="devtag"><b>开发中版本</b> v0.1.1-dev · 内容和数值还在调整，更新后旧存档可能失效</div>
+  <div class="devtag"><b>开发中版本</b> v0.2.1-dev · 四年海湾</div>
 </div>
 
-<div id="sys"><div id="sysCard"></div></div>
+<div id="sys" inert><div id="sysCard"></div></div>
 <div id="bInfo"></div><div id="bTag"></div>
 <input type="file" id="logFile" accept=".json,application/json" style="display:none">
 <button id="sysBtn" aria-label="菜单" data-tip="菜单（Esc）"><svg class="ic"><use href="#i-menu"/></svg></button>
-<script type="module" src="src/boot.js?v=0.1.1-dev"></script>
+<script src="src/locale-en.js?v=0.2.1-dev"></script>
+<script src="src/locale.js?v=0.2.1-dev"></script>
+<script type="module" src="src/boot.js?v=0.2.1-dev" onerror="document.getElementById('intro').classList.add('load-error')"></script>
 </body>
 </html>
